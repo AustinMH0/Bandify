@@ -5,13 +5,11 @@ import { MantineProvider } from '@mantine/core';
 
 import { Header as Header } from './components/Header/Header';
 import { Main as Main } from './components/Main/Main'
-import { SpheresBackground } from './components/Spheres/SpheresBackground';
 
 export default function App() {
   return (
     <MantineProvider>
       <Header />
-      <SpheresBackground />
       <Main />
     </MantineProvider>
   );

@@ -1,49 +1,51 @@
 /** @jsxImportSource @emotion/react */
-
 import { css } from '@emotion/react';
-import * as motion from "motion/react-client"
+import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
+
+//background-image: linear-gradient(319deg,  0%, #aa00ff 37%, #cc4499 100%);
+// #313dff // #313dff #aa00ff 0%, #cc4499 37%, #71116a 100% #663dff
 
 const sphereStyle = css({
   position: 'absolute',
   borderRadius: '50%',
-  background: `radial-gradient(circle, rgba(255, 0, 150, 1), rgba(0, 204, 255, 1))`,
+  background: `radial-gradient(circle, rgba(220,53,227,1) 0%, rgba(191,36,190,1) 35%, rgba(41,2,22,0.7979924391631652) 100%)`,
   boxShadow: '0px 10px 30px rgba(0, 0, 0, 0.3)',
   transform: 'translate(-50%, -50%)',
-  offsetPath: `path("M50,30 Q60,10 85,20 Q100,30 105,50 Q110,70 100,90 Q90,110 80,120 Q70,130 50,120 Q40,110 40,90 Q40,70 50,50 Q60,30 50,30 Z")`,
+  filter: 'blur(10px)'
 });
 
-const transition = { duration: 10, repeat: Infinity, ease: 'easeInOut' , repeatType: 'reverse'}
-
 const Sphere = ({ size }: { size: number }) => {
+  const [position, setPosition] = useState({
+    x: Math.random() * window.innerWidth * 0.8, // Initial random X
+    y: Math.random() * window.innerHeight * 0.8, // Initial random Y
+  });
+
+  useEffect(() => {
+    const updatePosition = () => {
+      setPosition({
+        x: Math.random() * window.innerWidth * 0.8, // Avoid edges
+        y: Math.random() * window.innerHeight * 0.8,
+      });
+    };
+
+    const interval = setInterval(updatePosition, 10000); // Update every 5s
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <div style={{ position: "relative" }}>
-    <motion.path
-        d="M50,30 Q60,10 85,20 Q100,30 105,50 Q110,70 100,90 Q90,110 80,120 Q70,130 50,120 Q40,110 40,90 Q40,70 50,50 Q60,30 50,30 Z"
-        fill="transparent"
-        strokeWidth="12"
-        stroke="var(--hue-6-transparent)"
-        strokeLinecap="round"
-        initial={{ pathLength: 0.001 }}
-        animate={{ pathLength: 1 }}
-    />
     <motion.div
       css={sphereStyle}
       style={{
         width: size,
         height: size,
-        top: '0%',
-        left: '20%',
       }}
-      initial={{ offsetDistance: "0%", scale: 1 }}
-      animate={{ offsetDistance: "100%", scale: 1 }}
-      transition={transition}
+      initial={{ x: position.x, y: position.y }} // Set initial position
+      animate={{ x: position.x, y: position.y }}
+      transition={{ duration: 8, ease: "easeInOut" }}
     />
-  </div>
   );
 };
 
 export default Sphere;
-
-
