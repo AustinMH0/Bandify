@@ -1,71 +1,61 @@
 
-  import {
-    Box,
-    Burger,
-    Button,
-    Divider,
-    Drawer,
-    Group,
-    HoverCard,
-    ScrollArea,
-    useMantineTheme,
-  } from '@mantine/core';
+
+  import { useState } from 'react';
+  import { Burger, Button, Container, Group } from '@mantine/core';
   import { useDisclosure } from '@mantine/hooks';
+
   import classes from './Header.module.css';
   import { ReactComponent as BandifyLogo } from '../../assets/bandify.svg';
+
+  const links = [
+    { link: '/about', label: 'Features' },
+    { link: '/start', label: 'Get Started' },
+  ];
   
   export function Header() {
-    const [drawerOpened, { toggle: toggleDrawer, close: closeDrawer }] = useDisclosure(false);
-    const [linksOpened, { toggle: toggleLinks }] = useDisclosure(false);
-    const theme = useMantineTheme();
+    const [opened, { toggle }] = useDisclosure(false);
+    const [active, setActive] = useState(links[0].link);
+  
+    const items = links.map((link) => (
+      <a
+        key={link.label}
+        href={link.link}
+        className={classes.link}
+        data-active={active === link.link || undefined}
+        onClick={(event) => {
+          event.preventDefault();
+          setActive(link.link);
+        }}
+      >
+        {link.label}
+      </a>
+    ));
+    
 
     return (
-      <Box pb={0} pos={'fixed'} top={0} style={{position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 1}}>
-        <header className={classes.header}>
-          <Group justify="space-between" align="center" >
-          
-            <BandifyLogo />
-
-            <Group visibleFrom="sm">
-              <Button size="md" variant="subtle" color="grape">Features</Button>
+      <header className={classes.header}>
+        <Container fluid size="lg" className={classes.inner}>
+          <BandifyLogo />
+          <Group visibleFrom="sm">
               <Button 
-                variant="outline" color="grape">Get Started</Button>
+                size="md" 
+                variant="subtle" 
+                color="grape"
+                onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth"})}
+              >
+                  Features
+                </Button>
+              <Button 
+                variant="outline" 
+                color="grape"
+                onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth"})}
+              >
+                  Get Started
+              </Button>
             </Group>
   
-            <Burger opened={drawerOpened} onClick={toggleDrawer} hiddenFrom="sm" />
-          </Group>
-        </header>
-  
-        <Drawer
-          opened={drawerOpened}
-          onClose={closeDrawer}
-          size="100%"
-          padding="md"
-          title="Navigation"
-          hiddenFrom="sm"
-          zIndex={1000000}
-        >
-          <ScrollArea h="calc(100vh - 80px" mx="-md">
-            <Divider my="sm" />
-  
-            <a href="#" className={classes.link}>
-              Home
-            </a>
-            <a href="#" className={classes.link}>
-              About
-            </a>
-            {/* <a href="#" className={classes.link}>
-              Academy
-            </a> */}
-  
-            <Divider my="sm" />
-  
-            <Group justify="center" grow pb="xl" px="md">
-              <Button variant="default">Log in</Button>
-              <Button>Sign up</Button>
-            </Group>
-          </ScrollArea>
-        </Drawer>
-      </Box>
+          <Burger opened={opened} onClick={toggle} hiddenFrom="xs" size="sm" />
+        </Container>
+      </header>
     );
   }
