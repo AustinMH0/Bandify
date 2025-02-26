@@ -1,3 +1,4 @@
+
   import {
     Box,
     Burger,
@@ -11,7 +12,7 @@
   } from '@mantine/core';
   import { useDisclosure } from '@mantine/hooks';
   import classes from './Header.module.css';
-  
+  import { ReactComponent as BandifyLogo } from '../../assets/bandify.svg';
   
   export function Header() {
     const [drawerOpened, { toggle: toggleDrawer, close: closeDrawer }] = useDisclosure(false);
@@ -19,28 +20,16 @@
     const theme = useMantineTheme();
 
     return (
-      <Box pb={0} pos={'sticky'} top={0} style={{position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 1}}>
+      <Box pb={0} pos={'fixed'} top={0} style={{position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 1}}>
         <header className={classes.header}>
-          <Group justify="space-between" h="100%">
-  
-            <Group h="100%" gap={0} visibleFrom="sm">
-              <a href="#" className={classes.link}>
-                Home
-              </a>
-              <HoverCard width={600} position="bottom" radius="md" shadow="md" withinPortal>
-  
-              </HoverCard>
-              <a href="#" className={classes.link}>
-                Learn
-              </a>
-              {/* <a href="#" className={classes.link}>
-                Academy
-              </a> */}
-            </Group>
-  
+          <Group justify="space-between" align="center" >
+          
+            <BandifyLogo />
+
             <Group visibleFrom="sm">
-              <Button variant="default">Log in</Button>
-              <Button>Sign up</Button>
+              <Button size="md" variant="subtle" color="grape">Features</Button>
+              <Button 
+                variant="outline" color="grape">Get Started</Button>
             </Group>
   
             <Burger opened={drawerOpened} onClick={toggleDrawer} hiddenFrom="sm" />
