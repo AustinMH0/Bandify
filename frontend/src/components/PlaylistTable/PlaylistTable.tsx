@@ -70,9 +70,8 @@ const PlaylistTable = () => {
     <div>
         <h2>Your Playlists</h2>
         <Accordion
-
-            classNames={{ chevron: classes.chevron , content: classes.content }}
-            chevron={<IconPlus className={classes.icon} />}
+            transitionDuration={1000}
+            classNames={classes}
         >
             {items}
         </Accordion>
@@ -80,44 +79,5 @@ const PlaylistTable = () => {
 
   );
 
-//   return (
-//     <div>
-//       <h2>Your Playlists</h2>
-//       <Table striped highlightOnHover>
-//         <thead>
-//           <tr>
-//             <th>Title</th>
-//             <th>Total Tracks</th>
-//             <th>Actions</th>
-//           </tr>
-//         </thead>
-//         <tbody>
-//           {playlists.map((playlist) => (
-//             <tr key={playlist.id}>
-//               <td>{playlist.name}</td>
-//               <td>{playlist.total_tracks}</td>
-//               <td>
-//                 <Button onClick={() => fetchTracks(playlist.id)}>View Tracks</Button>
-//               </td>
-//             </tr>
-//           ))}
-//         </tbody>
-//       </Table>
-
-//       {selectedPlaylist && (
-//         <div>
-//           <h3>Tracks for {playlists.find((p) => p.id === selectedPlaylist)?.name}</h3>
-//           <ul>
-//             {tracks.map((track, index) => (
-//               <li key={index}>
-//                 {track.artist} - {track.name}
-//               </li>
-//             ))}
-//           </ul>
-//         </div>
-//       )}
-//     </div>
-//   );
-// };
 };
 export default PlaylistTable;

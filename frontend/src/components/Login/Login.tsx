@@ -5,7 +5,7 @@ const Login = () => {
     window.location.href = "http://localhost:5000/get_playlists"; 
   };
 
-  return <Button onClick={handleLogin}>Login with Spotify</Button>;
+  return <Button onClick={handleLogin}>Bandify your Playlists</Button>;
 };
 
 export default Login;
