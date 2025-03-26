@@ -6,7 +6,6 @@ import Login from '../Login/Login';
 
 export function Main() {
   return (
-    <MantineProvider defaultColorScheme="dark">
     <div className={classes.wrapper}>
       <SpheresBackground />
       <SpheresBackground />
@@ -30,9 +29,6 @@ export function Main() {
           <PlaylistTable />
         </Container>
       </div>
-
-
     </div>
-    </MantineProvider>
   );
 }

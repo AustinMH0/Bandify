@@ -41,7 +41,7 @@ sp = Spotify(auth_manager=sp_oauth, requests_timeout=10)
 
 @app.route('/')
 def home():
-    """Redirect user to login if not authenticated"""
+
     if not sp_oauth.validate_token(cache_handler.get_cached_token()):
         auth_url = sp_oauth.get_authorize_url()
         return redirect(auth_url)
@@ -50,40 +50,40 @@ def home():
 
 @app.route('/callback')
 def callback():
-    """Handle Spotify OAuth callback"""
+
     sp_oauth.get_access_token(request.args['code'])
     return redirect(url_for('get_playlists'))
 
 
 @app.route('/get_playlists')
 def get_playlists():
-    """Fetch user's playlists"""
-    token_info = cache_handler.get_cached_token()
+    if not sp_oauth.validate_token(cache_handler.get_cached_token()):
+        auth_url = sp_oauth.get_authorize_url()
+        return redirect(auth_url)
 
-    if not token_info or not sp_oauth.validate_token(token_info):
-        return jsonify({"error": "Unauthorized"}), 401
-
-    sp = Spotify(auth_manager=sp_oauth)
-    
     playlists = sp.current_user_playlists()
     user_id = sp.me()['id']
-    
-    playlist_data = []
-    
+    result = []
+
     for playlist in playlists['items']:
         if playlist['owner']['id'] == user_id:
-            playlist_data.append({
-                "id": playlist['id'],
-                "name": playlist['name'],
-                "total_tracks": playlist['tracks']['total']
+            # Get the first image URL, or use a placeholder if there is no image
+            image_url = playlist['images'][0]['url'] if playlist['images'] else None
+            
+            result.append({
+                "id": playlist["id"],
+                "name": playlist["name"],
+                "total_tracks": playlist["tracks"]["total"],
+                "image": image_url
             })
 
-    return jsonify(playlist_data)
+    return jsonify(result)
+
 
 
 @app.route('/get_tracks/<playlist_id>')
 def get_tracks(playlist_id):
-    """Fetch tracks for a given playlist ID"""
+
     token_info = cache_handler.get_cached_token()
 
     if not token_info or not sp_oauth.validate_token(token_info):
@@ -109,7 +109,7 @@ def get_tracks(playlist_id):
 
 @app.route('/logout')
 def logout():
-    """Clear session and log out user"""
+
     session.clear()
     return redirect(url_for('home'))
 

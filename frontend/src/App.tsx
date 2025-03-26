@@ -8,7 +8,7 @@ import { Main as Main } from './components/Main/Main'
 
 export default function App() {
   return (
-    <MantineProvider>
+    <MantineProvider defaultColorScheme="dark">
       <Header />
       <Main />
     </MantineProvider>
