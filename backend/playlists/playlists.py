@@ -2,7 +2,8 @@ from dotenv import load_dotenv
 
 import os
 
-from flask import Flask, session, redirect, url_for, request
+from flask import Flask, session, redirect, url_for, request, jsonify
+from flask_cors import CORS
 
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
@@ -12,6 +13,7 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(64)
+CORS(app)
 
 client_id = os.getenv('CLIENT_ID')
 client_secret = os.getenv('CLIENT_SECRET')
@@ -30,7 +32,6 @@ sp_oauth = SpotifyOAuth(
 
 sp = Spotify(auth_manager=sp_oauth, requests_timeout=10)
 
-
 @app.route('/')
 def home():
     if not sp_oauth.validate_token(cache_handler.get_cached_token()):
@@ -43,36 +44,42 @@ def callback():
     sp_oauth.get_access_token(request.args['code'])
     return redirect(url_for('get_playlists'))
 
-def show_tracks(results):
-    track_list = []
-    for i, item in enumerate(results['items']):
-        track = item['track']
-        track_list.append(f"{i+1}. {track['artists'][0]['name']} - {track['name']}")
-    return '<br>'.join(track_list)
+# def show_tracks(results):
+#     track_list = []
+#     for i, item in enumerate(results['items']):
+#         track = item['track']
+#         track_list.append(f"{i+1}. {track['artists'][0]['name']} - {track['name']}")
+#     return '<br>'.join(track_list)
 
 @app.route('/get_playlists')
 def get_playlists():
     if not sp_oauth.validate_token(cache_handler.get_cached_token()):
-        auth_url = sp_oauth.get_authorize_url()
-        return redirect(auth_url)
+        return jsonify({"error": "Unauthorized"}), 401
 
     playlists = sp.current_user_playlists()
-    user_id = sp.me()['id']
-    res = ''
+    user_id = sp.me()['id'] # gets the current authenticated Spotify user's profile information
+    playlist_data = []
 
     for playlist in playlists['items']:
         if playlist['owner']['id'] == user_id:
-            res += f"<h3>{playlist['name']}</h3>"
-            res += f"<p>Total tracks: {playlist['tracks']['total']}</p>"
-
             tracks = sp.playlist_items(playlist['id'], fields="items,next", additional_types=('track', ))
-            res += show_tracks(tracks)  
 
-            while tracks['next']:
-                tracks = sp.next(tracks)
-                res += show_tracks(tracks)  
+            track_list = []
+            for item in tracks['items']:
+                track = item['track']
+                track_list.append({
+                    "name": track['name'],
+                    "artist": track['artists'][0]['name']
+                })
+            
+            playlist_data.append({
+                "id": playlist['id'],
+                "name": playlist['name'],
+                "total_tracks": playlist['tracks']['total'],
+                "tracks": track_list
+            })
 
-    return res
+    return jsonify(playlist_data)
 
 @app.route('/logout')
 def logout():
