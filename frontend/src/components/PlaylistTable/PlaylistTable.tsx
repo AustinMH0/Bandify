@@ -18,6 +18,7 @@ const PlaylistTable = () => {
   const [tracks, setTracks] = useState<Record<string, Track[]>>({});
   const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
+  const [user, setUser] = useState<{ display_name: string; profile_picture: string | null } | null>(null);
 
   useEffect(() => {
     const fetchPlaylists = async () => {
@@ -25,16 +26,20 @@ const PlaylistTable = () => {
         const response = await fetch("http://localhost:5000/get_playlists", {
           credentials: "include",
         });
-
+  
         if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
-
-        const data: Playlist[] = await response.json();
-        setPlaylists(data);
+  
+        const data = await response.json();
+        setUser({
+          display_name: data.display_name,
+          profile_picture: data.profile_picture
+        });
+        setPlaylists(data.playlists);
       } catch (error) {
         console.error("Error fetching playlists:", error);
       }
     };
-
+  
     fetchPlaylists();
   }, []);
 
@@ -70,7 +75,7 @@ const PlaylistTable = () => {
             <Card shadow="sm" padding="lg" onClick={() => fetchTracks(playlist.id)} style={{ cursor: "pointer" }}>
             <Card.Section>
               <Image
-                src={playlist.image || "https://via.placeholder.com/300"}
+                src={playlist.image}
                 height={160}
                 alt={playlist.name}
                 fit="cover"
@@ -79,7 +84,7 @@ const PlaylistTable = () => {
               <Text size="lg" mt="md">
                 {playlist.name}
               </Text>
-              <Text size="sm" color="dimmed">
+              <Text size="sm" c="dimmed">
                 {playlist.total_tracks} tracks
               </Text>
             </Card>
@@ -96,7 +101,7 @@ const PlaylistTable = () => {
           }}
           size="auto" 
           radius="md"
-          title="Tracklist" 
+          title ="Tracklist"
           centered>
         {selectedPlaylist && tracks[selectedPlaylist] ? (
           <List>
@@ -111,7 +116,7 @@ const PlaylistTable = () => {
         ) : (
           <Text>Loading tracks...</Text>
         )}
-        <Button fullWidth mt="md" onClick={() => setModalOpened(false)}>Close</Button>
+        <Button fullWidth variant="light" mt="md" onClick={() => setModalOpened(false)}>Bandify Playlist</Button>
       </Modal>
     </div>
   );
