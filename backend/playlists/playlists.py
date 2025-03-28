@@ -62,14 +62,15 @@ def get_playlists():
         return redirect(auth_url)
 
     playlists = sp.current_user_playlists()
-    user_id = sp.me()['id']
+    user_info = sp.me()
+    user_id = user_info['id']
     result = []
+
+    profile_pic = user_info['images'][0]['url'] if user_info['images'] else None
 
     for playlist in playlists['items']:
         if playlist['owner']['id'] == user_id:
-            # Get the first image URL, or use a placeholder if there is no image
             image_url = playlist['images'][0]['url'] if playlist['images'] else None
-            
             result.append({
                 "id": playlist["id"],
                 "name": playlist["name"],
@@ -77,7 +78,11 @@ def get_playlists():
                 "image": image_url
             })
 
-    return jsonify(result)
+    return jsonify({
+        "display_name": user_info["display_name"],
+        "profile_picture": profile_pic,
+        "playlists": result
+    })
 
 
 
