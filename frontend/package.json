@@ -20,6 +20,7 @@
     "@mantine/emotion": "^7.16.0",
     "@mantine/hooks": "^7.16.0",
     "@tabler/icons-react": "^3.31.0",
+    "axios": "^1.8.4",
     "motion": "^11.18.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
