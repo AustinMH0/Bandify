@@ -18,7 +18,7 @@ const PlaylistTable = () => {
   const [tracks, setTracks] = useState<Record<string, Track[]>>({});
   const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
-  const [user, setUser] = useState<{ display_name: string; profile_picture: string | null } | null>(null);
+  const [, setUser] = useState<{ display_name: string; profile_picture: string | null } | null>(null);
 
   useEffect(() => {
     const fetchPlaylists = async () => {
