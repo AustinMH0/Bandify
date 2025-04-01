@@ -1,4 +1,4 @@
-import { Container, Text } from '@mantine/core';
+import { Container } from '@mantine/core';
 import { SpheresBackground } from '../Spheres/SpheresBackground';
 import classes from './Main.module.css';
 import PlaylistTable from '../PlaylistTable/PlaylistTable';
