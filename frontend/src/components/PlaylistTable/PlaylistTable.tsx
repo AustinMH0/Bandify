@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Modal, Card, Grid, Text, List, Button, Image } from "@mantine/core";
+import { Modal, Card, Grid, Text, ScrollArea, Button, Image, Table, useMantineTheme } from "@mantine/core";
 
 interface Playlist {
   id: string;
@@ -18,7 +18,12 @@ const PlaylistTable = () => {
   const [tracks, setTracks] = useState<Record<string, Track[]>>({});
   const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
-  const [user, setUser] = useState<{ display_name: string; profile_picture: string | null } | null>(null);
+  const [, setUser] = useState<{ display_name: string; profile_picture: string | null } | null>(null);
+  const [showPriceTable, setPriceTable] = useState(false);
+  const [showTrackTable, setTrackTable] = useState(false);
+  const [tableButton, setTableButton] = useState("View Prices");  
+
+  const theme = useMantineTheme();
 
   useEffect(() => {
     const fetchPlaylists = async () => {
@@ -61,6 +66,7 @@ const PlaylistTable = () => {
       setTracks((prev) => ({ ...prev, [playlistId]: data }));
       setSelectedPlaylist(playlistId);
       setModalOpened(true);
+      setTrackTable(true);
     } catch (error) {
       console.error("Error fetching tracks:", error);
     }
@@ -92,31 +98,115 @@ const PlaylistTable = () => {
         ))}
       </Grid>
 
-      <Modal 
-          opened={modalOpened} 
-          onClose={() => setModalOpened(false)}
-          overlayProps={{
-            backgroundOpacity: 0.55,
-            blur: 3,
-          }}
-          size="auto" 
-          radius="md"
-          title ="Tracklist"
-          centered>
-        {selectedPlaylist && tracks[selectedPlaylist] ? (
-          <List>
-            {tracks[selectedPlaylist].map((track, index) => (
-              <List.Item key={index}>
-                <Text>
-                  <strong>{track.artist}</strong> - {track.name}
-                </Text>
-              </List.Item>
-            ))}
-          </List>
+      <Modal
+        opened={modalOpened}
+        onClose={() => {
+          setModalOpened(false);
+          setPriceTable(false);
+          setTrackTable(true);
+        }}
+        overlayProps={{
+          backgroundOpacity: 0.55,
+          blur: 3,
+        }}
+        size="lg" 
+        radius="md"
+        title="Tracklist"
+        centered
+        styles={{
+          body: { 
+            display: "flex", 
+            flexDirection: "column",
+            maxHeight: "70vh" 
+          },
+          title: {
+            color: theme.colors.grape[3],
+            textAlign: "center"
+          }
+        }}
+      >
+
+      <div style={{ flex: 1, overflowY: "auto", paddingBottom: "60px" }}> 
+        {showTrackTable && selectedPlaylist && tracks[selectedPlaylist] ? (
+          <Table>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>#</Table.Th>
+                <Table.Th>Artist</Table.Th>
+                <Table.Th>Track</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {tracks[selectedPlaylist].map((track, index) => (
+                <Table.Tr key={index}>
+                  <Table.Td>{index + 1}</Table.Td>
+                  <Table.Td>{track.name}</Table.Td>
+                  <Table.Td>{track.artist}</Table.Td> 
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
         ) : (
-          <Text>Loading tracks...</Text>
+          <Text>No tracks available</Text>
         )}
-        <Button fullWidth variant="light" mt="md" onClick={() => setModalOpened(false)}>Bandify Playlist</Button>
+
+        {showPriceTable && selectedPlaylist && tracks[selectedPlaylist] ? (
+          <Table>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Track</Table.Th>
+                <Table.Th>Bandcamp</Table.Th>
+                <Table.Th>Beatport</Table.Th>
+                <Table.Th>iTunes</Table.Th>
+                <Table.Th>Amazon Music</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {tracks[selectedPlaylist].map((track, index) => (
+                <Table.Tr key={index}>
+                  <Table.Td>{track.name}</Table.Td>
+                  <Table.Td>$--</Table.Td> 
+                  <Table.Td>$--</Table.Td>
+                  <Table.Td>$--</Table.Td>
+                  <Table.Td>$--</Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        ) : (
+          <Text>No tracks available</Text>
+        )}
+      </div>
+
+      <div style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          width: "100%",
+          backgroundColor: theme.colors.dark[7],
+          padding: "10px",
+          boxShadow: "0 -2px 5px rgba(0, 0, 0, 0.1)"
+        }}
+      >
+        <Button 
+          fullWidth 
+          variant="outline"
+          color="grape"
+          onClick={() => {
+            if (showTrackTable) {
+              setTrackTable(false);
+              setPriceTable(true);
+              setTableButton("View Playlist");
+            } else {
+              setTrackTable(true);
+              setPriceTable(false);
+              setTableButton("View Prices");
+            }
+          }}
+        >
+          {tableButton}
+        </Button>
+      </div>
       </Modal>
     </div>
   );
