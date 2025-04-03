@@ -111,17 +111,27 @@ const PlaylistTable = () => {
         }}
         size="lg" 
         radius="md"
-        title="Tracklist"
+        title={
+          selectedPlaylist ? playlists.find((p) => p.id === selectedPlaylist)?.name || "Tracklist" : "Tracklist"
+        }
         centered
         styles={{
+          header: {
+            textAlign: "center", 
+            // backgroundColor: theme.colors.grape[7], 
+            padding: "10px",
+            borderRadius: "8px 8px 0 0", 
+          },
           body: { 
             display: "flex", 
             flexDirection: "column",
             maxHeight: "70vh" 
           },
           title: {
-            color: theme.colors.grape[3],
-            textAlign: "center"
+            width: "100%",
+            textAlign: "center", 
+            fontWeight: "bold",
+            color: theme.colors.grape[3]
           }
         }}
       >
