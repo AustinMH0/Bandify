@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Modal, Card, Grid, Text, ScrollArea, Button, Image, Table, useMantineTheme } from "@mantine/core";
+import { Modal, Card, Grid, Text, Button, Image, Table, useMantineTheme } from "@mantine/core";
 
 interface Playlist {
   id: string;
