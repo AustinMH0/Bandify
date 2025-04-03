@@ -4,9 +4,15 @@ name: Build and Test React Application
 on:
   # Triggers the workflow on push or pull request events but only for the main branch
   push:
-    branches: [ "dev", "main" ]
+    branches:
+      - main
+      - 'dev'
+      - 'frontend/**'
   pull_request:
-    branches: [ "dev", "main" ]
+    branches:
+      - main
+      - 'dev'
+      - 'frontend/**'
 
 defaults:
   run:
