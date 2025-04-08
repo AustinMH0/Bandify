@@ -2,30 +2,26 @@ from dotenv import load_dotenv
 
 import os
 
-from flask import Flask, session, redirect, url_for, request, jsonify
+from flask import Blueprint, session, redirect, url_for, request, jsonify
 from flask_cors import CORS
 
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
 from spotipy.cache_handler import FlaskSessionCacheHandler
 
-# Load environment variables
 load_dotenv()
 
-# Flask app setup
-app = Flask(__name__)
-app.config['SECRET_KEY'] = os.urandom(64)
 
-# Enable CORS
-CORS(app, supports_credentials=True)
+playlists_bp = Blueprint('playlists', __name__)
+CORS(playlists_bp, supports_credentials=True)
 
-# Spotify API credentials
+# Spotify config
 client_id = os.getenv('CLIENT_ID')
 client_secret = os.getenv('CLIENT_SECRET')
 redirect_uri = 'http://localhost:5000/callback'
 scope = 'playlist-read-private playlist-read-collaborative'
 
-# Set up Spotify auth
+# Auth handler
 cache_handler = FlaskSessionCacheHandler(session)
 sp_oauth = SpotifyOAuth(
     client_id=client_id,
@@ -39,23 +35,22 @@ sp_oauth = SpotifyOAuth(
 # Global Spotify instance
 sp = Spotify(auth_manager=sp_oauth, requests_timeout=10)
 
-@app.route('/')
-def home():
 
+@playlists_bp.route('/')
+def home():
     if not sp_oauth.validate_token(cache_handler.get_cached_token()):
         auth_url = sp_oauth.get_authorize_url()
         return redirect(auth_url)
-    return redirect(url_for('get_playlists'))
+    return redirect(url_for('playlists.get_playlists'))
 
 
-@app.route('/callback')
+@playlists_bp.route('/callback')
 def callback():
-
     sp_oauth.get_access_token(request.args['code'])
-    return redirect(url_for('get_playlists'))
+    return redirect(url_for('playlists.get_playlists'))
 
 
-@app.route('/get_playlists')
+@playlists_bp.route('/get_playlists')
 def get_playlists():
     if not sp_oauth.validate_token(cache_handler.get_cached_token()):
         auth_url = sp_oauth.get_authorize_url()
@@ -64,19 +59,17 @@ def get_playlists():
     playlists = sp.current_user_playlists()
     user_info = sp.me()
     user_id = user_info['id']
-    result = []
-
     profile_pic = user_info['images'][0]['url'] if user_info['images'] else None
 
-    for playlist in playlists['items']:
-        if playlist['owner']['id'] == user_id:
-            image_url = playlist['images'][0]['url'] if playlist['images'] else None
-            result.append({
-                "id": playlist["id"],
-                "name": playlist["name"],
-                "total_tracks": playlist["tracks"]["total"],
-                "image": image_url
-            })
+    result = [
+        {
+            "id": playlist["id"],
+            "name": playlist["name"],
+            "total_tracks": playlist["tracks"]["total"],
+            "image": playlist["images"][0]['url'] if playlist['images'] else None
+        }
+        for playlist in playlists['items'] if playlist['owner']['id'] == user_id
+    ]
 
     return jsonify({
         "display_name": user_info["display_name"],
@@ -85,10 +78,8 @@ def get_playlists():
     })
 
 
-
-@app.route('/get_tracks/<playlist_id>')
+@playlists_bp.route('/get_tracks/<playlist_id>')
 def get_tracks(playlist_id):
-
     token_info = cache_handler.get_cached_token()
 
     if not token_info or not sp_oauth.validate_token(token_info):
@@ -112,11 +103,7 @@ def get_tracks(playlist_id):
     return jsonify(tracks)
 
 
-@app.route('/logout')
+@playlists_bp.route('/logout')
 def logout():
-
     session.clear()
-    return redirect(url_for('home'))
-
-if __name__ == '__main__':
-    app.run(debug=True)
+    return redirect(url_for('playlists.home'))
