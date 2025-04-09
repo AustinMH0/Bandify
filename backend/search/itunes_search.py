@@ -1,37 +1,36 @@
 import json
 import requests
 from urllib.parse import quote
-
+from time import sleep
+from fake_useragent import UserAgent
+from difflib import SequenceMatcher
 
 class ItuneSearch:
-
-
     def __init__(self):
         pass
 
-    @staticmethod   
-    def search_song(artistName, trackName) -> float:
-
-        parameters = f"{artistName} {trackName}" #itunes search terms
-
+    @staticmethod
+    def search_song(artistName: str, trackName: str) -> float:
+        # Put track name first in search term
+        parameters = f"{trackName} {artistName}"
         url = f"https://itunes.apple.com/search?term={quote(parameters)}&entity=musicTrack&attribute=mixTerm&explicit=Yes"
-        response = requests.get(url) # fetch json object
-        response.raise_for_status()
         
-        jsResponse = json.loads(response.text) # convert response content to dictionary
+        ua = UserAgent()
+        headers = {
+            "User-Agent": ua.random
+        }
+
+        try:
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            jsResponse = response.json()
+            
+            for result in jsResponse.get("results", []):
+                if result.get("kind") == "song":
+                    print(f"Found match: {result['trackName']} by {result['artistName']}")
+                    return result.get("trackPrice", -1)
+        except requests.exceptions.RequestException as e:
+            print(f"iTunes error: {e}")
         
-        results = jsResponse["results"]
-        for result in results:
-            if result["kind"] == "song" and result["trackName"] == trackName:
-                return result["trackPrice"] # return track price (assumes that first track in "results" that has a matching name is the one we want)
-        
-        return -1 # if not found return -1    
-        
-        # print(url)
-        # print(parameters)
-
-
-
-
-
+        return -1
 
