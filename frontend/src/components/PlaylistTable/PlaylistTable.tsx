@@ -22,7 +22,7 @@ const PlaylistTable = () => {
   const [showPriceTable, setPriceTable] = useState(false);
   const [showTrackTable, setTrackTable] = useState(false);
   const [tableButton, setTableButton] = useState("View Prices");
-  const [itunesPrices, setItunesPrices] = useState<Record<string, number | null>>({});
+  const [itunesPrices, setItunesPrices] = useState<Record<string, { price: number; url: string } | null>>({});
 
 
   const theme = useMantineTheme();
@@ -78,7 +78,7 @@ const PlaylistTable = () => {
     if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
   
     try {
-      const response = await fetch("http://localhost:5000/itunes_prices", {
+      const response = await fetch("http://localhost:5000/itunes_result", {
         method: "POST",
         credentials: "include",
         headers: {
@@ -92,19 +92,21 @@ const PlaylistTable = () => {
       const data = await response.json();
       console.log("Raw iTunes price response:", data);
   
-      // Store the prices in a map with track name as the key
-      const priceMap: Record<string, number | null> = {};
+      const priceMap: Record<string, { price: number; url: string } | null> = {};
       data.forEach((item: any) => {
-        priceMap[item.name] = item.price;
+        if (item.price !== undefined && item.url) {
+          priceMap[item.name] = { price: item.price, url: item.url };
+        } else {
+          priceMap[item.name] = null;
+        }
       });
-      console.log("itunesPrices:", itunesPrices);
-
-      setItunesPrices(priceMap);
   
+      setItunesPrices(priceMap);
     } catch (error) {
       console.error("Error fetching iTunes prices:", error);
     }
   };
+  
   
 
   return (
@@ -213,12 +215,19 @@ const PlaylistTable = () => {
                   <Table.Td>$--</Table.Td> 
                   <Table.Td>$--</Table.Td>
                   <Table.Td>
-                    {
-                      typeof itunesPrices[track.name] === "number"
-                        ? `$${itunesPrices[track.name]?.toFixed(2)}`
-                        : "N/A"
-                    }
-                </Table.Td>
+                    {itunesPrices[track.name] ? (
+                      <a
+                        href={itunesPrices[track.name]?.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "#007aff", textDecoration: "none" }}
+                      >
+                        ${itunesPrices[track.name]?.price.toFixed(2)}
+                      </a>
+                    ) : (
+                      "N/A"
+                    )}
+                  </Table.Td>
                   <Table.Td>$--</Table.Td>
                 </Table.Tr>
               ))}
