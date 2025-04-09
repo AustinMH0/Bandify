@@ -6,19 +6,15 @@ from ..search import ItuneSearch
 
 itunes_bp = Blueprint('itunes_bp', __name__)
 
-@itunes_bp.route('/itunes_prices', methods=['POST'])
-def get_itunes_prices():
-    data = request.get_json()  # Get the posted JSON data
+@itunes_bp.route('/itunes_result', methods=['POST'])
+def get_itunes_result():
+    data = request.get_json()
 
-    # Log the incoming data to verify the request
-    # print(f'Received data: {data}')
-
-    tracks = data.get('tracks')  # Extract the list of tracks
-
+    tracks = data.get('tracks')
     if not tracks:
         return jsonify({'error': 'No tracks provided'}), 400
 
-    prices = []  # List to hold prices for each track
+    result = [] # Holds track price and URL
 
     for track in tracks:
         artist = track.get('artist')
@@ -28,26 +24,27 @@ def get_itunes_prices():
         print(f"Track name: {name}")
 
         if not artist or not name:
-            prices.append({'error': 'Missing artist or track name'})
+            result.append({'error': 'Missing artist or track name'})
             continue
 
-        # Try just the first artist
         main_artist = artist.split(',')[0].strip()
         print(f"Using main_artist: {main_artist}")
 
         iSearch = ItuneSearch()
 
         try:
-            price = iSearch.search_song(main_artist, name)
+            search = iSearch.search_song(main_artist, name)
+            price = search.get("price", -1)
+            url = search.get("url", "")
+
             print(f"Price from iTunes: {price}")
+            print(f"Track URL: {url}")
 
             if price == -1:
-                prices.append({'artist': artist, 'name': name, 'error': 'Track not found on iTunes'})
+                result.append({'name': name, 'artist': artist, 'error': 'Track not found on iTunes'})
             else:
-                prices.append({'artist': artist, 'name': name, 'price': price})
+                result.append({'name': name, 'artist': artist, 'price': price, 'url': url})
         except Exception as e:
-            prices.append({'artist': artist, 'name': name, 'error': f'Error: {str(e)}'})
+            result.append({'name': name, 'artist': artist, 'error': f'Error: {str(e)}'})
 
-    # print('\n')
-    # print(json.dumps(prices, indent=4))
-    return jsonify(prices)
+    return jsonify(result)
