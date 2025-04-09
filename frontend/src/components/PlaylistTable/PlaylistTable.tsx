@@ -21,7 +21,9 @@ const PlaylistTable = () => {
   const [, setUser] = useState<{ display_name: string; profile_picture: string | null } | null>(null);
   const [showPriceTable, setPriceTable] = useState(false);
   const [showTrackTable, setTrackTable] = useState(false);
-  const [tableButton, setTableButton] = useState("View Prices");  
+  const [tableButton, setTableButton] = useState("View Prices");
+  const [itunesPrices, setItunesPrices] = useState<Record<string, number | null>>({});
+
 
   const theme = useMantineTheme();
 
@@ -71,6 +73,39 @@ const PlaylistTable = () => {
       console.error("Error fetching tracks:", error);
     }
   };
+
+  const fetchItunesPrices = async () => {
+    if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
+  
+    try {
+      const response = await fetch("http://localhost:5000/itunes_prices", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ tracks: tracks[selectedPlaylist] }),
+      });
+  
+      if (!response.ok) throw new Error("Failed to fetch iTunes prices");
+  
+      const data = await response.json();
+      console.log("Raw iTunes price response:", data);
+  
+      // Store the prices in a map with track name as the key
+      const priceMap: Record<string, number | null> = {};
+      data.forEach((item: any) => {
+        priceMap[item.name] = item.price;
+      });
+      console.log("itunesPrices:", itunesPrices);
+
+      setItunesPrices(priceMap);
+  
+    } catch (error) {
+      console.error("Error fetching iTunes prices:", error);
+    }
+  };
+  
 
   return (
     <div>
@@ -142,8 +177,8 @@ const PlaylistTable = () => {
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>#</Table.Th>
-                <Table.Th>Artist</Table.Th>
                 <Table.Th>Track</Table.Th>
+                <Table.Th>Artist</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -177,7 +212,13 @@ const PlaylistTable = () => {
                   <Table.Td>{track.name}</Table.Td>
                   <Table.Td>$--</Table.Td> 
                   <Table.Td>$--</Table.Td>
-                  <Table.Td>$--</Table.Td>
+                  <Table.Td>
+                    {
+                      typeof itunesPrices[track.name] === "number"
+                        ? `$${itunesPrices[track.name]?.toFixed(2)}`
+                        : "N/A"
+                    }
+                </Table.Td>
                   <Table.Td>$--</Table.Td>
                 </Table.Tr>
               ))}
@@ -202,8 +243,9 @@ const PlaylistTable = () => {
           fullWidth 
           variant="outline"
           color="grape"
-          onClick={() => {
+          onClick={async () => {
             if (showTrackTable) {
+              await fetchItunesPrices();
               setTrackTable(false);
               setPriceTable(true);
               setTableButton("View Playlist");

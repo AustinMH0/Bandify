@@ -12,7 +12,7 @@ from spotipy.cache_handler import FlaskSessionCacheHandler
 load_dotenv()
 
 
-playlists_bp = Blueprint('playlists', __name__)
+playlists_bp = Blueprint('playlists_bp', __name__)
 CORS(playlists_bp, supports_credentials=True)
 
 # Spotify config
@@ -47,7 +47,7 @@ def home():
 @playlists_bp.route('/callback')
 def callback():
     sp_oauth.get_access_token(request.args['code'])
-    return redirect(url_for('playlists.get_playlists'))
+    return redirect(url_for('playlists_bp.get_playlists'))
 
 
 @playlists_bp.route('/get_playlists')
@@ -63,18 +63,18 @@ def get_playlists():
 
     result = [
         {
-            "id": playlist["id"],
-            "name": playlist["name"],
-            "total_tracks": playlist["tracks"]["total"],
-            "image": playlist["images"][0]['url'] if playlist['images'] else None
+            'id': playlist['id'],
+            'name': playlist['name'],
+            'total_tracks': playlist['tracks']['total'],
+            'image': playlist['images'][0]['url'] if playlist['images'] else None
         }
         for playlist in playlists['items'] if playlist['owner']['id'] == user_id
     ]
 
     return jsonify({
-        "display_name": user_info["display_name"],
-        "profile_picture": profile_pic,
-        "playlists": result
+        'display_name': user_info['display_name'],
+        'profile_picture': profile_pic,
+        'playlists': result
     })
 
 
@@ -83,22 +83,22 @@ def get_tracks(playlist_id):
     token_info = cache_handler.get_cached_token()
 
     if not token_info or not sp_oauth.validate_token(token_info):
-        return jsonify({"error": "Unauthorized"}), 401
+        return jsonify({'error': 'Unauthorized'}), 401
 
     sp = Spotify(auth_manager=sp_oauth)
     
     tracks = []
-    results = sp.playlist_items(playlist_id, fields="items(track(name,artists(name))),next")
+    results = sp.playlist_items(playlist_id, fields='items(track(name,artists(name))),next')
 
     while results:
-        for item in results["items"]:
-            track = item["track"]
+        for item in results['items']:
+            track = item['track']
             tracks.append({
-                "name": track["name"],
-                "artist": ", ".join(artist["name"] for artist in track["artists"])
+                'name': track['name'],
+                'artist': ', '.join(artist['name'] for artist in track['artists'])
             })
         
-        results = sp.next(results) if results["next"] else None
+        results = sp.next(results) if results['next'] else None
 
     return jsonify(tracks)
 
