@@ -38,6 +38,6 @@ class ItuneSearch:
         except requests.exceptions.RequestException as e:
             print(f"An error occurred while fetching data from iTunes: {e}")
 
-        sleep(2)
+        #sleep(2)
         return {"price": -1, "url": ""}
 
