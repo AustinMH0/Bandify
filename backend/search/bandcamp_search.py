@@ -33,7 +33,7 @@ class BandcampSearch:
         options.add_argument("--silent")
         return webdriver.Chrome(options=options)
 
-    def get_track_url(self):
+    def get_track_price(self):
         search_url = f'https://bandcamp.com/search?q={self.track}+{self.artist}&item_type=t'
         returned = requests.get(search_url)
         
@@ -56,21 +56,26 @@ class BandcampSearch:
 
         heading = first_track.select_one(".heading a")
         url = heading['href']
-        return url
+        price_span = soup.select_one('span.base-text-color')
+        price = price_span.get_text(strip = True) if price_span else "Price not found"
+
+        return {"price": price or -1, "url": url or ""}
+
+
         
     
-    def get_track_price(self, url):
-        # Visit track page
-        # self.driver.get(url)
-        #sleep(2)
-        returned = requests.get(url)
-        track_soup = BeautifulSoup(returned.content, 'html.parser')
+    # def get_track_price(self, url):
+    #     # Visit track page
+    #     # self.driver.get(url)
+    #     #sleep(2)
+    #     returned = requests.get(url)
+    #     track_soup = BeautifulSoup(returned.content, 'html.parser')
 
-        price_span = track_soup.select_one('span.base-text-color')
-        price = price_span.get_text(strip=True) if price_span else "Price not found"
+    #     price_span = track_soup.select_one('span.base-text-color')
+    #     price = price_span.get_text(strip=True) if price_span else "Price not found"
 
-        #self.driver.quit()
-        return price
+    #     #self.driver.quit()
+    #     return price
 
 
 # Example Usage:
