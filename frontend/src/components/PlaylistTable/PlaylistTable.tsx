@@ -109,7 +109,7 @@ const PlaylistTable = () => {
   };
 
   const fetchBandcampPrices = async () => {
-    if (!tracks || !tracks[selectedPlaylist])
+    if (!selectedPlaylist || !tracks[selectedPlaylist])
       return
 
     try {
