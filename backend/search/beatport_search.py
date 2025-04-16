@@ -1,8 +1,4 @@
-import requests
 from urllib.parse import quote
-from time import sleep
-from fake_useragent import UserAgent
-
 import concurrent.futures
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
