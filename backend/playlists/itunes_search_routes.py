@@ -20,8 +20,8 @@ def get_itunes_result():
         artist = track.get('artist')
         name = track.get('name')
 
-        print(f"\nOriginal artist: {artist}")
-        print(f"Track name: {name}")
+        # print(f"\nOriginal artist: {artist}")
+        # print(f"Track name: {name}")
 
         if not artist or not name:
             result.append({'error': 'Missing artist or track name'})
@@ -37,8 +37,8 @@ def get_itunes_result():
             price = search.get("price", -1)
             url = search.get("url", "")
 
-            print(f"Price from iTunes: {price}")
-            print(f"Track URL: {url}")
+            # print(f"Price from iTunes: {price}")
+            # print(f"Track URL: {url}")
 
             if price == -1:
                 result.append({'name': name, 'artist': artist, 'error': 'Track not found on iTunes'})
