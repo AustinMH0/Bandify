@@ -24,6 +24,7 @@ const PlaylistTable = () => {
   const [tableButton, setTableButton] = useState("View Prices");
   const [itunesPrices, setItunesPrices] = useState<Record<string, { price: number; url: string } | null>>({});
   const [bandCampPrices, setBandCampPrices] = useState<Record<string, { price: number; url: string; } | null>>({});
+  const [beatportPrices, setBeatportPrices] = useState<Record<string, { price: number; url: string; } | null>>({});
 
 
   const theme = useMantineTheme();
@@ -149,6 +150,46 @@ const PlaylistTable = () => {
   };
 
 
+  const fetchBeatportPrices = async () => {
+    if (!selectedPlaylist || !tracks[selectedPlaylist])
+      return
+
+    try {
+      const response = await fetch("http://localhost:5000/beatport_results", {
+        method: "POST",
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ tracks: tracks[selectedPlaylist] })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch Beatport Prices!")
+      }
+
+      const data = await response.json()
+
+      console.log("Full Beatport prices data:", data);
+
+      const pricesMap: Record<string, { price: number; url: string } | null> = {};
+      data.forEach((item: any) => {
+        if (item.price !== undefined && item.url) {
+          pricesMap[item.name] = { price: item.price, url: item.url };
+        }
+        else {
+          pricesMap[item.name] = null;
+        }
+      });
+
+      setBeatportPrices(pricesMap);
+    } catch (error) {
+      console.error("Error fetching prices", error)
+    }
+
+
+  };
+
 
   return (
     <div>
@@ -250,10 +291,13 @@ const PlaylistTable = () => {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
+
+                {/* Bandcamp Prices */}
                 {tracks[selectedPlaylist].map((track, index) => (
                   <Table.Tr key={index}>
                     <Table.Td>{track.name}</Table.Td>
-                    <Table.Td>{bandCampPrices[track.name] ? (
+                    <Table.Td>
+                      {bandCampPrices[track.name] ? (
                       <a
                         href={bandCampPrices[track.name]?.url}
                         target="_blank"
@@ -266,7 +310,24 @@ const PlaylistTable = () => {
                       "N/A"
                     )}
                     </Table.Td>
-                    <Table.Td>$--</Table.Td>
+
+                    {/* Beatport Prices */}
+                    <Table.Td>
+                    {beatportPrices[track.name] ? (
+                        <a
+                          href={beatportPrices[track.name]?.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: "#007aff", textDecoration: "none" }}
+                        >
+                          ${beatportPrices[track.name]?.price.toFixed(2)}
+                        </a>
+                      ) : (
+                        "N/A"
+                      )}                    
+                    </Table.Td>
+
+                    {/* Itunes Prices */}
                     <Table.Td>
                       {itunesPrices[track.name] ? (
                         <a
@@ -281,7 +342,9 @@ const PlaylistTable = () => {
                         "N/A"
                       )}
                     </Table.Td>
+                    
                     <Table.Td>$--</Table.Td>
+
                   </Table.Tr>
                 ))}
               </Table.Tbody>
@@ -308,7 +371,8 @@ const PlaylistTable = () => {
             onClick={async () => {
               if (showTrackTable) {
                 await fetchBandcampPrices();
-                fetchItunesPrices();
+                await fetchItunesPrices();
+                await fetchBeatportPrices();
                 setTrackTable(false);
                 setPriceTable(true);
                 setTableButton("View Playlist");

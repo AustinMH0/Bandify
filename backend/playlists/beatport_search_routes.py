@@ -1,33 +1,24 @@
 from flask import Blueprint, request, jsonify
-
+from concurrent.futures import ThreadPoolExecutor
 from ..search import BeatportSearch
 
 beatport_bp = Blueprint('beatport_bp', __name__)
 
-@beatport_bp.route('/beatport_result', methods=['POST'])
+@beatport_bp.route('/beatport_results', methods=['POST'])
 def get_beatport_result():
     data = request.get_json()
-
     tracks = data.get('tracks')
     if not tracks:
         return jsonify({'error': 'No tracks provided'}), 400
 
-    result = []
-
-    for track in tracks:
+    def process_track(track):
         artist = track.get('artist')
         name = track.get('name')
 
-        print(f"\nOriginal artist: {artist}")
-        print(f"Track name: {name}")
-
         if not artist or not name:
-            result.append({'error': 'Missing artist or track name'})
-            continue
+            return {'error': 'Missing artist or track name'}
 
         main_artist = artist.split(',')[0].strip()
-        print(f"Using main_artist: {main_artist}")
-
         bpSearch = BeatportSearch()
 
         try:
@@ -35,14 +26,15 @@ def get_beatport_result():
             price = search.get("price", -1)
             url = search.get("url", "")
 
-            # print(f"Price from Beatport: {price}")
-            # print(f"Track URL: {url}")
-
             if price == -1:
-                result.append({'name': name, 'artist': artist, 'error': 'Track not found on iTunes'})
+                return {'name': name, 'artist': artist, 'error': 'Track not found on Beatport'}
             else:
-                result.append({'name': name, 'artist': artist, 'price': price, 'url': url})
+                return {'name': name, 'artist': artist, 'price': price, 'url': url}
         except Exception as e:
-            result.append({'name': name, 'artist': artist, 'error': f'Error: {str(e)}'})
+            return {'name': name, 'artist': artist, 'error': f'Error: {str(e)}'}
 
-    return jsonify(result)
+    # Use ThreadPoolExecutor to run searches concurrently
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        results = list(executor.map(process_track, tracks))
+
+    return jsonify(results)
