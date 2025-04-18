@@ -23,8 +23,8 @@ def get_beatport_result():
 
         try:
             search = bpSearch.search_song(name, main_artist)
-            price = search.get("price", -1)
-            url = search.get("url", "")
+            price = search.get('price', -1)
+            url = search.get('url', '')
 
             if price == -1:
                 return {'name': name, 'artist': artist, 'error': 'Track not found on Beatport'}
