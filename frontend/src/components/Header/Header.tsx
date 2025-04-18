@@ -1,7 +1,6 @@
-import { Burger, Button, Container, Group, Avatar, ActionIcon, Divider, Menu, Popover, Text } from '@mantine/core';
+import { Burger, Button, Container, Group, Avatar, ActionIcon, Popover, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useState } from "react";
-import { IconUser, IconSettings, IconStar, IconLogout, IconTool } from "@tabler/icons-react";
 import classes from './Header.module.css';
 import { ReactComponent as BandifyLogo } from '../../assets/bandify.svg';
 
@@ -11,16 +10,6 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ user }) => {
   const [opened, { toggle }] = useDisclosure(false);
-
-
-  const handleLogin = () => {
-    window.location.href = "http://localhost:5000/";
-  };
-
-  const handleLogout = () => {
-    window.location.href = "http://localhost:5000/logout";
-  };
-
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -116,7 +105,7 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
           //     </Menu.Item>
           //   </Menu.Dropdown>
           // </Menu>
-          
+
         ) : null}
 
         <Burger opened={opened} onClick={toggle} hiddenFrom="xs" size="sm" />
