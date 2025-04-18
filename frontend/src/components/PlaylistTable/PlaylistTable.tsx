@@ -292,24 +292,29 @@ const PlaylistTable = () => {
               </Table.Thead>
               <Table.Tbody>
 
-                {/* Bandcamp Prices */}
                 {tracks[selectedPlaylist].map((track, index) => (
                   <Table.Tr key={index}>
                     <Table.Td>{track.name}</Table.Td>
+
+                    {/* Bandcamp Prices */}
                     <Table.Td>
-                      {bandCampPrices[track.name] ? (
-                      <a
-                        href={bandCampPrices[track.name]?.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ color: "#007aff", textDecoration: "none" }}
-                      >
-                        ${bandCampPrices[track.name]?.price.toFixed(2)}
-                      </a>
-                    ) : (
-                      "N/A"
-                    )}
+                      {bandCampPrices[track.name] && bandCampPrices[track.name]?.url ? (
+                        <a
+                          href={bandCampPrices[track.name]?.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: "#007aff", textDecoration: "none" }}
+                        >
+                          {typeof bandCampPrices[track.name]?.price === 'number'
+                            ? `$${bandCampPrices[track.name]?.price.toFixed(2)}`
+                            : bandCampPrices[track.name]?.price}
+                        </a>
+                      ) : (
+                        ""
+                      )}
                     </Table.Td>
+
+
 
                     {/* Beatport Prices */}
                     <Table.Td>
@@ -323,7 +328,7 @@ const PlaylistTable = () => {
                           ${beatportPrices[track.name]?.price.toFixed(2)}
                         </a>
                       ) : (
-                        "N/A"
+                        ""
                       )}                    
                     </Table.Td>
 
@@ -339,7 +344,7 @@ const PlaylistTable = () => {
                           ${itunesPrices[track.name]?.price.toFixed(2)}
                         </a>
                       ) : (
-                        "N/A"
+                        ""
                       )}
                     </Table.Td>
                     
