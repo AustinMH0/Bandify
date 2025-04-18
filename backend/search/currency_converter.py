@@ -2,10 +2,15 @@ import requests
 from time import time
 from threading import Lock
 
+SECONDS = 1
+MINUTES = 60 * SECONDS
+HOURS = 60 * MINUTES
+DAYS = 24 * HOURS
+
 class CurrencyConverter:
     _cache = {}
     _cache_lock = Lock()
-    _ttl = 60 * 60  # 1 hour
+    _ttl = 1 * DAYS
 
     @classmethod
     def convert_to_usd(cls, currency: str, amount: float) -> float:
