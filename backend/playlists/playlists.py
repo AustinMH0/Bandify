@@ -11,6 +11,7 @@ from spotipy.cache_handler import FlaskSessionCacheHandler
 
 load_dotenv()
 
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
 
 playlists_bp = Blueprint('playlists_bp', __name__)
 CORS(playlists_bp, supports_credentials=True)
@@ -47,7 +48,7 @@ def home():
 @playlists_bp.route('/callback')
 def callback():
     sp_oauth.get_access_token(request.args['code'])
-    return redirect(url_for('playlists_bp.get_playlists'))
+    return redirect(FRONTEND_URL)
 
 
 @playlists_bp.route('/get_playlists')
