@@ -1,5 +1,4 @@
-import { Burger, Button, Container, Group, Avatar, ActionIcon, Popover, Text } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { Button, Container, Group, Avatar, ActionIcon, Popover, Text } from '@mantine/core';
 import { useState } from "react";
 import classes from './Header.module.css';
 import { ReactComponent as BandifyLogo } from '../../assets/bandify.svg';
@@ -9,11 +8,12 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ user }) => {
-  const [opened, { toggle }] = useDisclosure(false);
   const [hovered, setHovered] = useState(false);
 
   return (
     <header className={classes.header}>
+      <div className={`${classes.blob} ${classes.blob1}`} />
+      <div className={`${classes.blob} ${classes.blob2}`} />
       <Container fluid size="lg" className={classes.inner}>
         <BandifyLogo />
 
@@ -29,13 +29,12 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
           <Button 
             variant="outline" 
             color="grape"
-            onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth"})}
+            onClick={() => document.getElementById("get started")?.scrollIntoView({ behavior: "smooth"})}
           >
             Get Started
           </Button>
-        </Group>
 
-        {user ? (
+          {user ? (
           <Popover
             width={200}
             position="bottom-end"
@@ -77,6 +76,16 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
               </Text>
             </Popover.Dropdown>
           </Popover>
+          
+        ) : null}
+
+        </Group>
+      </Container>
+    </header>
+  );
+};
+
+export default Header; 
 
           // <Menu shadow="md" width={200} position="bottom-end">
           //   <Menu.Target>
@@ -105,13 +114,3 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
           //     </Menu.Item>
           //   </Menu.Dropdown>
           // </Menu>
-
-        ) : null}
-
-        <Burger opened={opened} onClick={toggle} hiddenFrom="xs" size="sm" />
-      </Container>
-    </header>
-  );
-};
-
-export default Header; 

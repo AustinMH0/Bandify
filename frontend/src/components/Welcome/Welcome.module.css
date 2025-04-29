@@ -1,0 +1,176 @@
+/* Hero Box */
+.heroBox {
+  position: relative;
+  border-radius: 12px;
+  padding: 12px; 
+  margin: 2rem auto;
+  max-width: 90%;
+  /* box-shadow: 0 0 20px rgba(227, 197, 255, 0.322); */
+  z-index: 0;
+  overflow: hidden;
+}
+
+/* Rotating Gradient */
+.heroBox::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200%;
+  height: 200%;
+  /* background: linear-gradient(light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6)), #e100ff); */
+  background: conic-gradient(from 0deg, var(--mantine-color-dark-6), #ff6ec4, #ff91d1);
+  background-repeat: no-repeat;
+  background-size: 100%100%, 50%50%;
+  z-index: -2;
+  animation: bgRotate 12s linear infinite;
+  filter: blur(30px);
+} 
+
+/* Overlay */
+.heroBox::after {
+  background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+  backdrop-filter: blur(20px);
+  border-radius: 12px;
+  z-index: -1;
+  background-color: transparent;
+}
+
+@keyframes bgRotate {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.sphereLayer {
+  position: absolute;
+  z-index: 0;
+  background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
+  opacity: 0.9;
+}
+
+/* .particlesWrapper canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.particlesWrapper {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+} */
+
+/* ----- Content within Hero Box ----- */
+
+.inner {
+  position: relative;
+  padding-top: 150px;
+  padding-bottom: 120px;
+  z-index: 1;
+
+  @media (max-width: 768px) {
+    padding-bottom: 80px;
+    padding-top: 80px;
+  }
+}
+
+.title {
+  font-family:
+    Greycliff CF,
+    var(--mantine-font-family);
+  font-size: 48px;
+  font-weight: 900;
+  line-height: 1.1;
+  margin: 0;
+  padding: 0;
+  color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
+
+  @media (max-width: 768px) {
+    font-size: 42px;
+    line-height: 1.2;
+  }
+}
+
+.description {
+  margin-top: var(--mantine-spacing-xl);
+  font-size: 18px;
+
+  @media (max-width: 768px) {
+    font-size: 18px;
+  }
+}
+
+.controls {
+  margin-top: calc(var(--mantine-spacing-xl) * 2);
+
+  @media (max-width: 768px) {
+    margin-top: var(--mantine-spacing-xl);
+  }
+}
+
+.control {
+  height: 54px;
+  padding-left: 38px;
+  padding-right: 38px;
+  position: relative;
+  z-index: 2;
+
+  @media (max-width: 768px) {
+    height: 54px;
+    padding-left: 18px;
+    padding-right: 18px;
+    flex: 1;
+  }
+}
+
+.animatedButton {
+  all: unset;
+  position: relative;
+  overflow: hidden;
+  z-index: 0;
+  border-radius: 12px;
+  padding: 1rem 2rem;
+  font-size: 1.25rem;
+  background-color: transparent;
+  color: #ff6ec4;
+  cursor: pointer;
+}
+
+.animatedButton::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 400%;
+  height: 400%;
+  background: conic-gradient(from 0deg, var(--mantine-color-dark-6), #ff6ec4, #ff91d1);
+  background-repeat: no-repeat;
+  background-size: 100%100%, 50%50%;
+  z-index: -2;
+  animation: bgRotate 12s linear infinite;
+  filter: blur(20px);
+}
+
+.animatedButton::after {
+  background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+  border-radius: 12px;
+  z-index: -1;
+  background-color: transparent;
+}
