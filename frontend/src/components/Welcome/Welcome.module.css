@@ -5,9 +5,10 @@
   padding: 12px; 
   margin: 2rem auto;
   max-width: 90%;
-  /* box-shadow: 0 0 20px rgba(227, 197, 255, 0.322); */
   z-index: 0;
   overflow: hidden;
+  min-height: 720px;
+  transition: min-height 0.4s ease;
 }
 
 /* Rotating Gradient */
@@ -42,6 +43,8 @@
   background-color: transparent;
 }
 
+/* ----- Animate the heroBox and animatedButton ----- */
+
 @keyframes bgRotate {
   0% {
     transform: translate(-50%, -50%) rotate(0deg);
@@ -51,12 +54,6 @@
   }
 }
 
-.sphereLayer {
-  position: absolute;
-  z-index: 0;
-  background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
-  opacity: 0.9;
-}
 
 /* .particlesWrapper canvas {
   width: 100%;
@@ -103,6 +100,7 @@
 }
 
 .description {
+
   margin-top: var(--mantine-spacing-xl);
   font-size: 18px;
 
@@ -134,6 +132,15 @@
   }
 }
 
+.sphereLayer {
+  position: absolute;
+  z-index: 0;
+  background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
+  opacity: 0.9;
+}
+
+/* ----- Copies from the same style as heroBox ----- */
+
 .animatedButton {
   all: unset;
   position: relative;
@@ -145,6 +152,7 @@
   background-color: transparent;
   color: #ff6ec4;
   cursor: pointer;
+  transition: transform 0.2s ease;
 }
 
 .animatedButton::before {
@@ -173,4 +181,54 @@
   border-radius: 12px;
   z-index: -1;
   background-color: transparent;
+}
+
+.animatedButton:hover {
+  transform: translateX(-4px);
+}
+
+/* ----- When setShowLoginCard == true ----- */
+
+.greenMode {
+  --primary-color: #00e676;
+  --text-color: #00e676;
+}
+
+.heroBox.greenMode::before {
+  background: conic-gradient(from 0deg, var(--mantine-color-dark-6), #00e676, #a6f4c5);
+}
+
+.animatedButton.greenMode {
+  color: var(--text-color);
+}
+
+.animatedButton.greenMode::before {
+  background: conic-gradient(from 0deg, var(--mantine-color-dark-6), #00e676, #a6f4c5);
+}
+
+/* ----- Back Arrow (when setShowLoginCard == true) ----- */
+
+.backArrow {
+  position: absolute;
+  top: 1.25rem;
+  left: 1.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  z-index: 10;
+  color: #00e676;
+  transition: transform 0.2s ease;
+}
+
+.backArrow:hover {
+  transform: translateX(-4px);
+}
+
+
+
+.greenMode h1,
+.greenMode p,
+.greenMode span {
+  color: var(--text-color);
 }

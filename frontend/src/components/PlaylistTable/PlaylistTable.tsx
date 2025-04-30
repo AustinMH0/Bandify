@@ -487,8 +487,8 @@ const PlaylistTable = () => {
               style={{ textAlign: "center" }}
             >
               <Card.Section inheritPadding py="md">
-                <Title order={2} c="grape">Welcome to Bandify</Title>
-                <Text c="white" mt="sm">
+                <Title order={2} c="#fdb6e0">Welcome to Bandify</Title>
+                <Text c="#fdb6e0" mt="sm">
                   Log in with Spotify to view your playlists and compare track prices across platforms.
                 </Text>
               </Card.Section>
@@ -517,3 +517,5 @@ const PlaylistTable = () => {
 };
 
 export default PlaylistTable;
+
+// "#fdb6e0" "#ff6ec4"
