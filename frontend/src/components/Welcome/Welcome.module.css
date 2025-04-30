@@ -7,7 +7,7 @@
   max-width: 90%;
   z-index: 0;
   overflow: hidden;
-  min-height: 720px;
+  height: 540px;
   transition: min-height 0.4s ease;
 }
 
@@ -72,7 +72,7 @@
 
 .inner {
   position: relative;
-  padding-top: 150px;
+  padding-top: 80px;
   padding-bottom: 120px;
   z-index: 1;
 

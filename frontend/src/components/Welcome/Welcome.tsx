@@ -1,15 +1,23 @@
+import { useEffect, useState } from "react";
+
 import { Container, Text, Group } from "@mantine/core";
 import { IconBrandSpotify, IconChevronLeft } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
+
 // import ParticlesBackground from "../ParticlesBackground/ParticlesBackground";
 import classes from "../Welcome/Welcome.module.css";
 
+interface WelcomeProps {
+  showLoginCard: boolean;
+  setShowLoginCard: (value: boolean) => void;
+}
+
+
 const MotionDiv = motion.div;
 
-const Welcome = () => {
+const Welcome: React.FC<WelcomeProps> = ({ showLoginCard, setShowLoginCard }) => {
+
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [showLoginCard, setShowLoginCard] = useState(false);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {

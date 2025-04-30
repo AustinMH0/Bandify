@@ -5,9 +5,10 @@ import { ReactComponent as BandifyLogo } from '../../assets/bandify.svg';
 
 interface HeaderProps {
   user: { display_name: string; profile_picture: string | null } | null;
+  onGetStartedClick?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ user }) => {
+const Header: React.FC<HeaderProps> = ({ user, onGetStartedClick }) => {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -29,7 +30,7 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
           <Button 
             variant="outline" 
             color="grape"
-            onClick={() => document.getElementById("get started")?.scrollIntoView({ behavior: "smooth"})}
+            onClick={onGetStartedClick}
           >
             Get Started
           </Button>
