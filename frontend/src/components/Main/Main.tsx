@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+
 import { Container } from '@mantine/core';
 
 import { SpheresBackground } from '../Spheres/SpheresBackground';
@@ -37,7 +38,11 @@ export function Main() {
 
   return (
     <div>
-      <Header user={user} onGetStartedClick={() => setShowLoginCard(true)} />
+      <Header 
+        user={user}
+        showLoginCard={showLoginCard}
+        setShowLoginCard={setShowLoginCard}
+      />
       <div className={classes.wrapper}>
         <div className={`${classes.blob} ${classes.blob1}`} />
           <div style={{ position: 'relative', zIndex: 0 }}>
@@ -45,7 +50,10 @@ export function Main() {
             <SpheresBackground />
           </div>
         <div className={classes.inner}>
-        <Welcome showLoginCard={showLoginCard} setShowLoginCard={setShowLoginCard} />
+        <Welcome 
+          showLoginCard={showLoginCard} 
+          setShowLoginCard={setShowLoginCard} 
+        />
           <Container>
             <PlaylistTable />
           </Container>

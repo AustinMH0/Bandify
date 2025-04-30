@@ -147,7 +147,7 @@ const Welcome: React.FC<WelcomeProps> = ({ showLoginCard, setShowLoginCard }) =>
                   transition={{ delay: 0.3, duration: 0.6, ease: "easeOut" }}
                 >
                   <Text className={classes.description} c="#a6f4c5">
-                    We’ll fetch your Spotify playlists so you can start comparing track prices across Bandcamp, iTunes, Beatport, and more.
+                    We’ll fetch your Spotify playlists so you can start comparing track prices across Bandcamp, iTunes, and Beatport.
                   </Text>
                 </MotionDiv>
 
@@ -157,17 +157,15 @@ const Welcome: React.FC<WelcomeProps> = ({ showLoginCard, setShowLoginCard }) =>
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.6, duration: 0.4 }}
                 >
-                  <Group gap="sm">
                     <button
                       className={`${classes.animatedButton} ${showLoginCard ? classes.greenMode : ""}`}
                       onClick={() => {
                         window.location.href = "http://localhost:5000/get_playlists";
                       }}
                     >
-                      <IconBrandSpotify size={20} />
-                      <span> Log in </span>
+                      <IconBrandSpotify size={22} style={{ position: "relative", top: "1px" }} />
+                       Log in 
                     </button>
-                  </Group>
                 </MotionDiv>
               </MotionDiv>
             </Container>
@@ -180,15 +178,3 @@ const Welcome: React.FC<WelcomeProps> = ({ showLoginCard, setShowLoginCard }) =>
 };
 
 export default Welcome;
-
-{/* <Button
-fullWidth
-color="grape"
-size="md"
-leftSection={<IconBrandSpotify size={20} />}
-onClick={() => {
-  window.location.href = "http://localhost:5000/get_playlists";
-}}
->
-Login with Spotify
-</Button> */}

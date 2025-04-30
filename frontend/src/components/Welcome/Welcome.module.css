@@ -146,18 +146,26 @@
   position: relative;
   overflow: hidden;
   z-index: 0;
-  border-radius: 12px;
+  border-radius: 6px;
   padding: 1rem 2rem;
   font-size: 1.25rem;
   background-color: transparent;
   color: #ff6ec4;
   cursor: pointer;
   transition: transform 0.2s ease;
+
+  display: inline-flex;       /* <--- Enables flexbox layout */
+  align-items: center;        /* <--- Vertically center icon + text */
+  gap: 0.5rem;                /* <--- Adds spacing between icon and text */
+  line-height: 1;             /* <--- Prevents vertical misalignment */
 }
 
 .animatedButton::before {
   content: "";
   position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px; 
   top: 50%;
   left: 50%;
   width: 400%;
@@ -178,7 +186,7 @@
   left: 1px;
   width: calc(100% - 2px);
   height: calc(100% - 2px);
-  border-radius: 12px;
+  border-radius: 6px;
   z-index: -1;
   background-color: transparent;
 }
@@ -223,12 +231,4 @@
 
 .backArrow:hover {
   transform: translateX(-4px);
-}
-
-
-
-.greenMode h1,
-.greenMode p,
-.greenMode span {
-  color: var(--text-color);
 }
