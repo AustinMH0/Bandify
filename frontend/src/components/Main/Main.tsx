@@ -8,11 +8,14 @@ import PlaylistTable from '../PlaylistTable/PlaylistTable';
 import Welcome from '../Welcome/Welcome'
 import Header from '../Header/Header';
 
-export function Main() {  
-  const [showLoginCard, setShowLoginCard] = useState(false);
+import type { Playlist } from "../../types/types";
 
+export function Main() {
+
+  const [showLoginCard, setShowLoginCard] = useState(false);
   const [user, setUser] = useState<{ display_name: string; profile_picture: string | null } | null>(null);
-  
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -27,6 +30,7 @@ export function Main() {
           display_name: data.display_name,
           profile_picture: data.profile_picture
         });
+        setPlaylists(data.playlists);
       } catch (error) {
         console.error("Error fetching user:", error);
       }
@@ -35,6 +39,7 @@ export function Main() {
     fetchUser();
   }, []);
 
+  const loggedIn = user !== null;
 
   return (
     <div>
@@ -45,19 +50,25 @@ export function Main() {
       />
       <div className={classes.wrapper}>
         <div className={`${classes.blob} ${classes.blob1}`} />
-          <div style={{ position: 'relative', zIndex: 0 }}>
-            <SpheresBackground />
-            <SpheresBackground />
-          </div>
-        <div className={classes.inner}>
-        <Welcome 
-          showLoginCard={showLoginCard} 
-          setShowLoginCard={setShowLoginCard} 
-        />
-          <Container>
-            <PlaylistTable />
-          </Container>
+        <div style={{ position: 'relative', zIndex: 0 }}>
+          <SpheresBackground />
+          <SpheresBackground />
         </div>
+        <div className={classes.inner}>
+          <Welcome 
+            user={user}
+            playlists={playlists}
+            showLoginCard={showLoginCard} 
+            setShowLoginCard={setShowLoginCard} 
+            loggedIn={loggedIn}
+          />
+        </div>
+        <Container>
+          <PlaylistTable 
+            playlists={playlists}
+            setPlaylists={setPlaylists}
+          />
+        </Container>
       </div>
     </div>
   );

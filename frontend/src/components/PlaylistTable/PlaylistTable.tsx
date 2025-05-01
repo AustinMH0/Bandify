@@ -1,38 +1,37 @@
 import { useState, useEffect } from "react";
+
 import axios from "axios";
 import {
   Button,
   Card,
-  Collapse,
-  Container,
   Grid,
   Image,
   Modal,
   Pagination,
   Table,
   Text,
-  Title,
   useMantineTheme
 } from "@mantine/core";
-import { IconBrandSpotify } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "framer-motion";
+
 import classes from '../PlaylistTable/PlaylistTable.module.css'
 
-interface Playlist {
-  id: string;
-  name: string;
-  total_tracks: number;
-  image: string | null;
-}
+import type { Playlist } from "../../types/types";
 
 interface Track {
   name: string;
   artist: string;
 }
 
-const PlaylistTable = () => {
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+const PlaylistTable = ({
+  playlists,
+  setPlaylists
+}: {
+  playlists: Playlist[];
+  setPlaylists: React.Dispatch<React.SetStateAction<Playlist[]>>;
+}) => {
+  // const [loggedIn, setLoggedIn] = useState(false);
+
   const [tracks, setTracks] = useState<Record<string, Track[]>>({});
   const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
@@ -90,7 +89,7 @@ const PlaylistTable = () => {
           withCredentials: true,
         });
         const data = response.data;
-        setLoggedIn(true);
+        // setLoggedIn(true);
         setUser({
           display_name: data.display_name,
           profile_picture: data.profile_picture,
@@ -208,9 +207,8 @@ const PlaylistTable = () => {
 
   return (
     <div>
-      {loggedIn ? (
+      {playlists.length > 0 ? (
         <div>
-          <Container fluid className={classes.animatedContainer}>
             <Button
               fullWidth
               variant="subtle"
@@ -227,8 +225,8 @@ const PlaylistTable = () => {
             >
               {opened ? "Hide Your Playlists" : "View Your Playlists"}
             </Button>
-
-            <Collapse in={opened}>
+          
+            <div id="playlist-cards" style={{ paddingTop: "4rem" }}>
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentPage}
@@ -237,67 +235,60 @@ const PlaylistTable = () => {
                   animate="visible"
                   exit="exit"
                 >
-          
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      minHeight: "900px", 
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    {/* Playlist Grid */}
-                    <Grid mt="md">
-                      {playlists
-                        .slice((currentPage - 1) * 9, currentPage * 9)
-                        .map((playlist) => (
-                          <Grid.Col key={playlist.id} span={4}>
-                            <motion.div variants={cardVariants}>
-                              <Card
-                                shadow="sm"
-                                padding="lg"
-                                onClick={() => fetchTracks(playlist.id)}
-                                style={{ cursor: "pointer" }}
-                              >
-                                <Card.Section>
-                                  <Image
-                                    src={playlist.image}
-                                    height={160}
-                                    alt={playlist.name}
-                                    fit="cover"
-                                  />
-                                </Card.Section>
+                  {/* Playlist Grid */}
+                  <Grid mt="md">
+                    {playlists
+                      .slice((currentPage - 1) * 6, currentPage * 6)
+                      .map((playlist) => (
+                        <Grid.Col 
+                          key={playlist.id} 
+                          span={4} 
+                          className={classes.playlistCard}>
+                          <motion.div variants={cardVariants}>
+                            <Card
+                              className={classes.cardContent}
+                              shadow="sm"
+                              padding="lg"
+                              onClick={() => fetchTracks(playlist.id)}
+                            
+                            >
+                              <Card.Section>
+                                <Image
+                                  src={playlist.image}
+                                  height={160}
+                                  alt={playlist.name}
+                                  fit="cover"
+                                />
+                              </Card.Section>
 
-                                <Text size="lg" mt="md" fw={500}>
-                                  {playlist.name}
-                                </Text>
-                                <Text size="sm" c="dimmed">
-                                  {playlist.total_tracks} tracks
-                                </Text>
-                              </Card>
-                            </motion.div>
-                          </Grid.Col>
-                        ))}
-                    </Grid>
+                              <Text className={classes.playlistTitle} size="lg" mt="md" fw={500}>
+                                {playlist.name}
+                              </Text>
+                              <Text className={classes.trackInfo} size="sm" c="dimmed">
+                                {playlist.total_tracks} tracks
+                              </Text>
+                            </Card>
+                          </motion.div>
+                        </Grid.Col>
+                      ))}
+                  </Grid>
 
-                    {/* Sticky Pagination */}
-                    {playlists.length > 9 && (
-                      <div style={{ marginTop: "2rem", display: "flex", justifyContent: "center" }}>
-                        <Pagination
-                          total={Math.ceil(playlists.length / 9)}
-                          value={currentPage}
-                          onChange={setCurrentPage}
-                          color="grape"
-                          radius="xl"
-                        />
-                      </div>
-                    )}
-                  </div>
+                  {/* Sticky Pagination */}
+                  {playlists.length > 6 && (
+                    <div style={{ marginTop: "2rem", display: "flex", justifyContent: "center" }}>
+                      <Pagination
+                        total={Math.ceil(playlists.length / 6)}
+                        value={currentPage}
+                        onChange={setCurrentPage}
+                        color="grape"
+                        radius="xl"
+                      />
+                    </div>
+                  )}
+                
                 </motion.div>
               </AnimatePresence>
-            </Collapse>
-          </Container>
-
+            </div>
 
           <Modal
             opened={modalOpened}
@@ -473,42 +464,7 @@ const PlaylistTable = () => {
           </Modal>
         </div>
       ) : (
-        <Container size="sm" mt={100}>
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-          >
-            <Card
-              shadow="xl"
-              padding="xl"
-              radius="md"
-              withBorder
-              style={{ textAlign: "center" }}
-            >
-              <Card.Section inheritPadding py="md">
-                <Title order={2} c="#fdb6e0">Welcome to Bandify</Title>
-                <Text c="#fdb6e0" mt="sm">
-                  Log in with Spotify to view your playlists and compare track prices across platforms.
-                </Text>
-              </Card.Section>
-      
-              <Card.Section mt="lg">
-                <Button
-                  fullWidth
-                  color="grape"
-                  size="md"
-                  leftSection={<IconBrandSpotify size={20} />}
-                  onClick={() => {
-                    window.location.href = "http://localhost:5000/get_playlists";
-                  }}
-                >
-                  Login with Spotify
-                </Button>
-              </Card.Section>
-            </Card>
-          </motion.div>
-        </Container>
+        null
       )
     }
     

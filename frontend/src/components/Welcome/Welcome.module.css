@@ -11,6 +11,10 @@
   transition: min-height 0.4s ease;
 }
 
+.heroBox.loggedIn {
+  height: auto;
+}
+
 /* Rotating Gradient */
 .heroBox::before {
   content: "";
@@ -154,10 +158,10 @@
   cursor: pointer;
   transition: transform 0.2s ease;
 
-  display: inline-flex;       /* <--- Enables flexbox layout */
-  align-items: center;        /* <--- Vertically center icon + text */
-  gap: 0.5rem;                /* <--- Adds spacing between icon and text */
-  line-height: 1;             /* <--- Prevents vertical misalignment */
+  display: inline-flex;       
+  align-items: center;        
+  gap: 0.5rem;                
+  line-height: 1;             
 }
 
 .animatedButton::before {
