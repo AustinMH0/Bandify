@@ -30,8 +30,6 @@ const PlaylistTable = ({
   playlists: Playlist[];
   setPlaylists: React.Dispatch<React.SetStateAction<Playlist[]>>;
 }) => {
-  // const [loggedIn, setLoggedIn] = useState(false);
-
   const [tracks, setTracks] = useState<Record<string, Track[]>>({});
   const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
@@ -238,7 +236,7 @@ const PlaylistTable = ({
                   {/* Playlist Grid */}
                   <Grid mt="md">
                     {playlists
-                      .slice((currentPage - 1) * 6, currentPage * 6)
+                      .slice((currentPage - 1) * 9, currentPage * 9)
                       .map((playlist) => (
                         <Grid.Col 
                           key={playlist.id} 
@@ -274,10 +272,10 @@ const PlaylistTable = ({
                   </Grid>
 
                   {/* Sticky Pagination */}
-                  {playlists.length > 6 && (
+                  {playlists.length > 9 && (
                     <div style={{ marginTop: "2rem", display: "flex", justifyContent: "center" }}>
                       <Pagination
-                        total={Math.ceil(playlists.length / 6)}
+                        total={Math.ceil(playlists.length / 9)}
                         value={currentPage}
                         onChange={setCurrentPage}
                         color="grape"
