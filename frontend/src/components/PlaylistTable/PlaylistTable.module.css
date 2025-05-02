@@ -43,7 +43,8 @@
   left: 50%;
   width: 200%;
   height: 200%;
-  background: conic-gradient(from 0deg, var(--mantine-color-dark-6), #ff6ec4, #ff91d1);
+  background: linear-gradient(#ff8800, #76ff64, #e100ff);
+  /* background: conic-gradient(from 0deg, var(--mantine-color-dark-6), #53ff3c, #ff62be); */
   animation: bgRotate 2s linear infinite;
   filter: blur(30px);
   z-index: 0;

@@ -14,7 +14,7 @@ export function Main() {
   const [showLoginCard, setShowLoginCard] = useState(false);
   const [user, setUser] = useState<{ display_name: string; profile_picture: string | null } | null>(null);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [hideHero, setHideHero] = useState(false); // <-- control this on scroll if needed
+  const [hideHero, setHideHero] = useState(false); 
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -41,19 +41,14 @@ export function Main() {
 
   const loggedIn = user !== null;
 
-  // Optional: Set hideHero on scroll
-  useEffect(() => {
-    const onScroll = () => {
-      if (window.scrollY > 100) {
-        setHideHero(true);
-      }
-    };
+  // useEffect(() => {
+  //   const onScroll = () => {
+  //     setHideHero(window.scrollY > 300);
+  //   };
+  //   window.addEventListener("scroll", onScroll);
+  //   return () => window.removeEventListener("scroll", onScroll);
+  // }, []);
   
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-  
-
   return (
     <div>
       <Header user={user} showLoginCard={showLoginCard} setShowLoginCard={setShowLoginCard} />
@@ -71,7 +66,6 @@ export function Main() {
             showLoginCard={showLoginCard}
             setShowLoginCard={setShowLoginCard}
             hideHero={hideHero}
-            classes={classes}
           />
         </div>
         <Container>

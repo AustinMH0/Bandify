@@ -15,7 +15,11 @@ export default function HeroLoggedIn({ user, playlists, classes }: any) {
         </motion.h1>
 
         <Text className={classes.description} mt="sm" c="#ff91d1">
-          You have {playlists.length} playlists synced.
+          You have{" "}
+          <Text component="span" c="#00e676"  inherit>
+            {playlists.length}
+          </Text>
+          {" "}playlists synced 
         </Text>
 
         <motion.div className={classes.controls} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.4 }}>
