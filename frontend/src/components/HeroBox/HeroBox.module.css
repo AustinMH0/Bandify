@@ -9,6 +9,7 @@
   overflow: hidden;
   height: 540px;
   transition: min-height 0.4s ease;
+  perspective: 1000px;
 }
 
 .heroBox.loggedIn {
@@ -53,7 +54,8 @@
   left: 50%;
   width: 200%;
   height: 200%;
-  background: linear-gradient(#e100ff, #ff8800, #76ff64);
+  background: conic-gradient(from 0deg, var(--mantine-color-dark-6), #76ff64, #97fc8a);
+  /* background: linear-gradient(#e100ff, #ff8800, #76ff64); */
   background-repeat: no-repeat;
   background-size: 100% 100%;
   z-index: -1;
