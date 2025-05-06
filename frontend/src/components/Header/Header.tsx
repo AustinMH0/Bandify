@@ -41,42 +41,43 @@ const Header: React.FC<HeaderProps> = ({ user, showLoginCard, setShowLoginCard }
           </Button>
 
           <AnimatePresence mode="wait">
-          {showLoginCard ? (
-            <MotionDiv className={classes.getStarted}
-              key="login-button"
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Button
-                
-                variant="outline"
-                color="green"
-                onClick={() => setShowLoginCard(true)}
-              >
-                <IconBrandSpotify size={20} />
-              </Button>
-            </MotionDiv>
-          ) : (
-            <MotionDiv
-              key="get-started-button"
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Button
-                className={classes.getStarted}
-                variant="outline"
-                color="grape"
-                onClick={() => setShowLoginCard(true)}
-              >
-                Get Started
-              </Button>
-            </MotionDiv>
-          )}
-        </AnimatePresence>
+            {!user && ( // ⬅️ Only show login buttons if user is not logged in
+              showLoginCard ? (
+                <MotionDiv className={classes.getStarted}
+                  key="login-button"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Button
+                    variant="outline"
+                    color="green"
+                    onClick={() => setShowLoginCard(true)}
+                  >
+                    <IconBrandSpotify size={20} />
+                  </Button>
+                </MotionDiv>
+              ) : (
+                <MotionDiv
+                  key="get-started-button"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Button
+                    className={classes.getStarted}
+                    variant="outline"
+                    color="grape"
+                    onClick={() => setShowLoginCard(true)}
+                  >
+                    Get Started
+                  </Button>
+                </MotionDiv>
+              )
+            )}
+          </AnimatePresence>
 
         {user ? (
         <Popover
@@ -115,7 +116,7 @@ const Header: React.FC<HeaderProps> = ({ user, showLoginCard, setShowLoginCard }
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
           >
-            <Text size="sm" ta="center">
+            <Text style={{zIndex: 10}} size="sm" ta="center">
               Welcome, {user.display_name}!
             </Text>
           </Popover.Dropdown>

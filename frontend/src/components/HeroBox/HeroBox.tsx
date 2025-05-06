@@ -42,7 +42,6 @@ const HeroBox = ({
   const [fastGradient, setFastGradient] = useState(false);
   const [, setFadeOut] = useState(false);
 
-  // Use refs for timeout cleanup
   const fadeTimeoutRef = useRef<number | null>(null);
   const clearTimeoutRef = useRef<number | null>(null);
 
@@ -50,9 +49,9 @@ const HeroBox = ({
     if (isInView) {
       bounceControls.start({
         scale: [0.95, 1.05],
-        transition: { type: "spring", stiffness: 900, damping: 10 },
+        transition: { type: "spring", stiffness: 600, damping: 10 },
       });
-      // No longer triggers fastGradient on scroll
+  
     }
   }, [isInView, bounceControls]);
 
@@ -112,7 +111,9 @@ const HeroBox = ({
             opacity,
             scale,
             transformStyle: "preserve-3d",
-            position: "relative",
+            backfaceVisibility: "hidden", // <-- this helps during rotation
+            willChange: "transform",      // <-- hint to browser to prepare GPU resources
+            position: "relative"
           }}
           className={`
             ${classes.heroBox}

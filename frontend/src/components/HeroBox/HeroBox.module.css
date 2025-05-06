@@ -2,7 +2,7 @@
 .heroBox {
   position: relative;
   border-radius: 12px;
-  padding: 12px; 
+  padding: 12px;
   margin: 2rem auto;
   max-width: 90%;
   z-index: 0;
@@ -10,7 +10,11 @@
   height: 540px;
   transition: min-height 0.4s ease;
   perspective: 1000px;
+  transform-style: preserve-3d;
+  will-change: transform;
+  backface-visibility: hidden;
 }
+
 
 .heroBox.loggedIn {
   height: auto;

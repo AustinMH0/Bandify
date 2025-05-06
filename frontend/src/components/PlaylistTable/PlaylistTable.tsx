@@ -40,7 +40,6 @@ const PlaylistTable = ({
   const [itunesPrices, setItunesPrices] = useState<Record<string, { price: number; url: string } | null>>({});
   const [bandCampPrices, setBandCampPrices] = useState<Record<string, { price: number; url: string; } | null>>({});
   const [beatportPrices, setBeatportPrices] = useState<Record<string, { price: number; url: string; } | null>>({});
-  const [opened, setOpened] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   const theme = useMantineTheme();
@@ -207,23 +206,7 @@ const PlaylistTable = ({
     <div>
       {playlists.length > 0 ? (
         <div>
-            <Button
-              fullWidth
-              variant="subtle"
-              color="grape"
-              size="md"
-              fw={600}
-              fz="1rem"
-              onClick={() => setOpened((o) => !o)}
-              styles={{
-                root: {
-                  backgroundColor: "transparent",
-                },
-              }}
-            >
-              {opened ? "Hide Your Playlists" : "View Your Playlists"}
-            </Button>
-          
+
             <div id="playlist-cards" style={{ paddingTop: "4rem" }}>
               <AnimatePresence mode="wait">
                 <motion.div
