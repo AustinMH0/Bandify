@@ -7,7 +7,7 @@ import datetime
 from ..search import BeatportSearch
 from ..search import BandcampSearch
 from ..search import ItuneSearch
-from .. import engine
+from .engine import engine
 
 # Function used to grab search API prices given track name and artist name
 def getApiPrices(artist, trackName):
