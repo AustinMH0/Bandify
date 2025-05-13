@@ -18,12 +18,11 @@ def getApiPrices(artist, trackName):
     #create timestamp for songs
     time_stamp = datetime.datetime.now()
 
-    #band_search = BandcampSearch()
-    #beatport_search = BeatportSearch()
+    band_search = BandcampSearch()
+    beatport_search = BeatportSearch()
     itunes_data = ItuneSearch.search_song(artist, trackName)
-    bandcamp_data = {'price': .99, 'url': "youtube.com"}
-    beatport_data = {'price': .69, 'url': "google.com"}
-
+    bandcamp_data = band_search.search_song(trackName, artist)
+    beatport_data = beatport_search.search_song(trackName, artist)
 
     itunes_price = itunes_data['price']
     itunes_url = itunes_data['url']
@@ -48,8 +47,8 @@ def get_db_result():
     if not tracks:
         return jsonify({'error': 'No tracks provided'}), 400
     
-    print(tracks)
-    print("=" * 50)
+    # print(tracks)
+    # print("=" * 50)
     # Grab track names and artists
     song_names = []
     artists = []
@@ -74,12 +73,12 @@ def get_db_result():
     # Query bandify db, if song exists return song data, else API search and insert()
     with engine.connect() as con:
 
-        print(list(chain.from_iterable(zip(song_names, artists))))
-        print("=" * 50)
-        print(song_names)
-        print("=" * 50)
-        print(artists)
-        print("=" * 50)
+        # print(list(chain.from_iterable(zip(song_names, artists))))
+        # print("=" * 50)
+        # print(song_names)
+        # print("=" * 50)
+        # print(artists)
+        # print("=" * 50)
         # "results" holds the query results
         with Session(engine) as sesh, sesh.begin():
             query = sesh.query(Track).filter(tuple_(Track.artist, Track.track_name).in_(zip(artists, song_names)))
@@ -112,11 +111,11 @@ def get_db_result():
                 final_data.append(songData)
 
         if new_song_data:
-            print(new_song_data)
+            # print(new_song_data)
             sesh.execute(insert(Track), new_song_data)
             sesh.commit()
-    
-    print(list(final_data))
+    # print("="*50)
+    # print(list(final_data))
 
     return jsonify(list(final_data))
 
