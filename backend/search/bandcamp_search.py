@@ -42,7 +42,7 @@ class BandcampSearch:
 
                 nyp_span = track_soup.find('span', string=lambda text: text and 'name your price' in text.lower())
                 if nyp_span:
-                    price = 'Free'
+                    price = 0.0
 
                 else:
                     buy_item = track_soup.select_one('li.buyItem:has(h4:contains("Buy Digital Track"))')
@@ -50,7 +50,7 @@ class BandcampSearch:
                         price_span = buy_item.select_one('span.base-text-color')
 
                         price_text = price_span.get_text(strip=True)
-                        print(f'Raw price text: {price_text}')
+                        #print(f'Raw price text: {price_text}')
 
                         # Extract currency symbol and amount
                         match = re.match(r'([^\d]+)?([\d.]+)', price_text)
@@ -67,17 +67,17 @@ class BandcampSearch:
                             }
 
                             currency_code = currency_map.get(symbol)
-                            print(f"Detected symbol: '{symbol}' | Code: {currency_code} | Amount: {amount}")
+                            #print(f"Detected symbol: '{symbol}' | Code: {currency_code} | Amount: {amount}")
 
                             try:
                                 if currency_code and currency_code != 'USD':
                                     usd_price = CurrencyConverter.convert_to_usd(currency_code, amount)
-                                    print(f'Converted {amount} {currency_code} to {usd_price} USD')
+                                    #print(f'Converted {amount} {currency_code} to {usd_price} USD')
                                     price = usd_price
                                 else:
                                     price = round(amount, 2)
                             except Exception as e:
-                                print(f'Currency conversion error: {e}')
+                                #print(f'Currency conversion error: {e}')
                                 price = -1
 
         return {'price': price, 'url': track_url}
