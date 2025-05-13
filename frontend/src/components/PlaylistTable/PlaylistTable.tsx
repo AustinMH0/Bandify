@@ -41,6 +41,7 @@ const PlaylistTable = ({
   const [bandCampPrices, setBandCampPrices] = useState<Record<string, { price: number; url: string; } | null>>({});
   const [beatportPrices, setBeatportPrices] = useState<Record<string, { price: number; url: string; } | null>>({});
   const [currentPage, setCurrentPage] = useState(1);
+  const [songPrices, setSongPrices] = useState<Record<string, { itunesPrice: number; itunesUrl: string; beatPortPrice: number; beatPortUrl: string; bandCampPrice: number; bandCampUrl: string; } | null>>({})
 
   const theme = useMantineTheme();
 
@@ -55,7 +56,7 @@ const PlaylistTable = ({
     },
     exit: { opacity: 0 },
   };
-  
+
   const cardVariants = {
     hidden: { opacity: 0, y: 20, scale: 0.95 },
     visible: {
@@ -78,7 +79,7 @@ const PlaylistTable = ({
       },
     },
   };
-  
+
   useEffect(() => {
     const fetchPlaylists = async () => {
       try {
@@ -120,6 +121,39 @@ const PlaylistTable = ({
       console.error("Error fetching tracks:", error);
     }
   };
+
+
+  const fetchSongPrices = async () => {
+    if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
+
+    try {
+      const response = await axios.post("http://localhost:5000/db_results", {
+        tracks: tracks[selectedPlaylist]
+      }, {
+        withCredentials: true,
+
+      });
+      const data = response.data;
+      console.log("Full song Data: ", data);
+
+      const priceMap: Record<string, { itunesPrice: number; itunesUrl: string; beatPortPrice: number; beatPortUrl: string; bandCampPrice: number; bandCampUrl: string; } | null> = {};
+
+      data.forEach((item: any) => {
+        if (item.track_name && item.artist) {
+          priceMap[item.track_name] = {
+            itunesPrice: item.itunes_price, itunesUrl: item.itunes_url,
+            bandCampPrice: item.bandcamp_price, bandCampUrl: item.bandcamp_url,
+            beatPortPrice: item.beatport_price, beatPortUrl: item.beatport_url
+          };
+        }
+
+      });
+      setSongPrices(priceMap);
+
+    } catch (error) {
+      console.error("Error fetching song prices: ", error);
+    }
+  }
 
   const fetchItunesPrices = async () => {
     if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
@@ -207,69 +241,69 @@ const PlaylistTable = ({
       {playlists.length > 0 ? (
         <div>
 
-            <div id="playlist-cards" style={{ paddingTop: "4rem" }}>
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentPage}
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
-                >
-                  {/* Playlist Grid */}
-                  <Grid mt="md">
-                    {playlists
-                      .slice((currentPage - 1) * 9, currentPage * 9)
-                      .map((playlist) => (
-                        <Grid.Col 
-                          key={playlist.id} 
-                          span={4} 
-                          className={classes.playlistCard}>
-                          <motion.div variants={cardVariants}>
-                            <Card
-                              className={classes.cardContent}
-                              shadow="sm"
-                              padding="lg"
-                              onClick={() => fetchTracks(playlist.id)}
-                            
-                            >
-                              <Card.Section>
-                                <Image
-                                  src={playlist.image}
-                                  height={160}
-                                  alt={playlist.name}
-                                  fit="cover"
-                                />
-                              </Card.Section>
+          <div id="playlist-cards" style={{ paddingTop: "4rem" }}>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentPage}
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                {/* Playlist Grid */}
+                <Grid mt="md">
+                  {playlists
+                    .slice((currentPage - 1) * 9, currentPage * 9)
+                    .map((playlist) => (
+                      <Grid.Col
+                        key={playlist.id}
+                        span={4}
+                        className={classes.playlistCard}>
+                        <motion.div variants={cardVariants}>
+                          <Card
+                            className={classes.cardContent}
+                            shadow="sm"
+                            padding="lg"
+                            onClick={() => fetchTracks(playlist.id)}
 
-                              <Text className={classes.playlistTitle} size="lg" mt="md" fw={500}>
-                                {playlist.name}
-                              </Text>
-                              <Text className={classes.trackInfo} size="sm" c="dimmed">
-                                {playlist.total_tracks} tracks
-                              </Text>
-                            </Card>
-                          </motion.div>
-                        </Grid.Col>
-                      ))}
-                  </Grid>
+                          >
+                            <Card.Section>
+                              <Image
+                                src={playlist.image}
+                                height={160}
+                                alt={playlist.name}
+                                fit="cover"
+                              />
+                            </Card.Section>
 
-                  {/* Sticky Pagination */}
-                  {playlists.length > 9 && (
-                    <div style={{ marginTop: "2rem", display: "flex", justifyContent: "center" }}>
-                      <Pagination
-                        total={Math.ceil(playlists.length / 9)}
-                        value={currentPage}
-                        onChange={setCurrentPage}
-                        color="grape"
-                        radius="xl"
-                      />
-                    </div>
-                  )}
-                
-                </motion.div>
-              </AnimatePresence>
-            </div>
+                            <Text className={classes.playlistTitle} size="lg" mt="md" fw={500}>
+                              {playlist.name}
+                            </Text>
+                            <Text className={classes.trackInfo} size="sm" c="dimmed">
+                              {playlist.total_tracks} tracks
+                            </Text>
+                          </Card>
+                        </motion.div>
+                      </Grid.Col>
+                    ))}
+                </Grid>
+
+                {/* Sticky Pagination */}
+                {playlists.length > 9 && (
+                  <div style={{ marginTop: "2rem", display: "flex", justifyContent: "center" }}>
+                    <Pagination
+                      total={Math.ceil(playlists.length / 9)}
+                      value={currentPage}
+                      onChange={setCurrentPage}
+                      color="grape"
+                      radius="xl"
+                    />
+                  </div>
+                )}
+
+              </motion.div>
+            </AnimatePresence>
+          </div>
 
           <Modal
             opened={modalOpened}
@@ -351,16 +385,17 @@ const PlaylistTable = ({
 
                         {/* Bandcamp Prices */}
                         <Table.Td>
-                          {bandCampPrices[track.name] && bandCampPrices[track.name]?.url ? (
+                          {(songPrices[track.name]) ? (
                             <a
-                              href={bandCampPrices[track.name]?.url}
+                              href={songPrices[track.name]?.bandCampUrl ? songPrices[track.name]?.bandCampUrl : "#"}
                               target="_blank"
                               rel="noopener noreferrer"
                               style={{ color: "#007aff", textDecoration: "none" }}
                             >
-                              {typeof bandCampPrices[track.name]?.price === 'number'
-                                ? `$${bandCampPrices[track.name]?.price.toFixed(2)}`
-                                : bandCampPrices[track.name]?.price}
+                              {songPrices[track.name]?.bandCampPrice !== null
+                                ? `$${songPrices[track.name]?.bandCampPrice}`
+                                : "$--"}
+
                             </a>
                           ) : (
                             ""
@@ -371,30 +406,34 @@ const PlaylistTable = ({
 
                         {/* Beatport Prices */}
                         <Table.Td>
-                        {beatportPrices[track.name] ? (
+                          {(songPrices[track.name]) ? (
                             <a
-                              href={beatportPrices[track.name]?.url}
+                              href={songPrices[track.name]?.beatPortUrl ? songPrices[track.name]?.beatPortUrl : "#"}
                               target="_blank"
                               rel="noopener noreferrer"
                               style={{ color: "#007aff", textDecoration: "none" }}
                             >
-                              ${beatportPrices[track.name]?.price.toFixed(2)}
+                              {songPrices[track.name]?.beatPortPrice !== null
+                                ? `$${songPrices[track.name]?.beatPortPrice}`
+                                : "$--"}
                             </a>
                           ) : (
                             ""
-                          )}                    
+                          )}
                         </Table.Td>
 
                         {/* Itunes Prices */}
                         <Table.Td>
-                          {itunesPrices[track.name] ? (
+                          {(songPrices[track.name]) ? (
                             <a
-                              href={itunesPrices[track.name]?.url}
+                              href={songPrices[track.name]?.itunesUrl ? songPrices[track.name]?.itunesUrl : "#"}
                               target="_blank"
                               rel="noopener noreferrer"
                               style={{ color: "#007aff", textDecoration: "none" }}
                             >
-                              ${itunesPrices[track.name]?.price.toFixed(2)}
+                              {songPrices[track.name]?.itunesPrice !== null
+                                ? `$${songPrices[track.name]?.itunesPrice}`
+                                : "$--"}
                             </a>
                           ) : (
                             ""
@@ -429,6 +468,7 @@ const PlaylistTable = ({
                     await fetchBandcampPrices();
                     await fetchItunesPrices();
                     await fetchBeatportPrices();
+                    await fetchSongPrices();
                     setTrackTable(false);
                     setPriceTable(true);
                     setTableButton("View Playlist");
@@ -447,8 +487,8 @@ const PlaylistTable = ({
       ) : (
         null
       )
-    }
-    
+      }
+
     </div>
   );
 };
