@@ -343,8 +343,9 @@ const PlaylistTable = ({
             }}
           >
 
-            <div style={{ flex: 1, overflowY: "auto", paddingBottom: "60px" }}>
-              {showTrackTable && selectedPlaylist && tracks[selectedPlaylist] ? (
+          <div style={{ flex: 1, overflowY: "auto", paddingBottom: "60px" }}>
+            {selectedPlaylist && tracks[selectedPlaylist] && tracks[selectedPlaylist].length > 0 ? (
+              showTrackTable ? (
                 <Table>
                   <Table.Thead>
                     <Table.Tr>
@@ -364,10 +365,6 @@ const PlaylistTable = ({
                   </Table.Tbody>
                 </Table>
               ) : (
-                <Text>No tracks available</Text>
-              )}
-
-              {showPriceTable && selectedPlaylist && tracks[selectedPlaylist] ? (
                 <Table>
                   <Table.Thead>
                     <Table.Tr>
@@ -378,76 +375,34 @@ const PlaylistTable = ({
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-
                     {tracks[selectedPlaylist].map((track, index) => (
                       <Table.Tr key={index}>
                         <Table.Td>{track.name}</Table.Td>
-
-                        {/* Bandcamp Prices */}
+                        {/* Price columns */}
                         <Table.Td>
-                          {(songPrices[track.name]) ? (
-                            <a
-                              href={songPrices[track.name]?.bandCampUrl ? songPrices[track.name]?.bandCampUrl : "#"}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: "#007aff", textDecoration: "none" }}
-                            >
-                              {songPrices[track.name]?.bandCampPrice !== null
-                                ? `$${songPrices[track.name]?.bandCampPrice}`
-                                : "$--"}
-
-                            </a>
-                          ) : (
-                            ""
-                          )}
+                          {songPrices[track.name] ? (
+                            <a href={songPrices[track.name]?.bandCampUrl ?? "#"}>{songPrices[track.name]?.bandCampPrice ?? "$--"}</a>
+                          ) : ""}
                         </Table.Td>
-
-
-
-                        {/* Beatport Prices */}
                         <Table.Td>
-                          {(songPrices[track.name]) ? (
-                            <a
-                              href={songPrices[track.name]?.beatPortUrl ? songPrices[track.name]?.beatPortUrl : "#"}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: "#007aff", textDecoration: "none" }}
-                            >
-                              {songPrices[track.name]?.beatPortPrice !== null
-                                ? `$${songPrices[track.name]?.beatPortPrice}`
-                                : "$--"}
-                            </a>
-                          ) : (
-                            ""
-                          )}
+                          {songPrices[track.name] ? (
+                            <a href={songPrices[track.name]?.beatPortUrl ?? "#"}>{songPrices[track.name]?.beatPortPrice ?? "$--"}</a>
+                          ) : ""}
                         </Table.Td>
-
-                        {/* Itunes Prices */}
                         <Table.Td>
-                          {(songPrices[track.name]) ? (
-                            <a
-                              href={songPrices[track.name]?.itunesUrl ? songPrices[track.name]?.itunesUrl : "#"}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: "#007aff", textDecoration: "none" }}
-                            >
-                              {songPrices[track.name]?.itunesPrice !== null
-                                ? `$${songPrices[track.name]?.itunesPrice}`
-                                : "$--"}
-                            </a>
-                          ) : (
-                            ""
-                          )}
+                          {songPrices[track.name] ? (
+                            <a href={songPrices[track.name]?.itunesUrl ?? "#"}>{songPrices[track.name]?.itunesPrice ?? "$--"}</a>
+                          ) : ""}
                         </Table.Td>
-
                       </Table.Tr>
                     ))}
                   </Table.Tbody>
                 </Table>
-              ) : (
-                <Text>No tracks available</Text>
-              )}
-            </div>
+              )
+            ) : (
+              <Text>No tracks available</Text>
+            )}
+          </div>
 
             <div style={{
               position: "absolute",
