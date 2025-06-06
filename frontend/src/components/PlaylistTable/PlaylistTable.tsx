@@ -35,12 +35,9 @@ const PlaylistTable = ({
   const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
   const [, setUser] = useState<{ display_name: string; profile_picture: string | null } | null>(null);
-  const [showPriceTable, setPriceTable] = useState(false);
+  const [, setPriceTable] = useState(false);
   const [showTrackTable, setTrackTable] = useState(false);
   const [tableButton, setTableButton] = useState("View Prices");
-  const [itunesPrices, setItunesPrices] = useState<Record<string, { price: number; url: string } | null>>({});
-  const [bandCampPrices, setBandCampPrices] = useState<Record<string, { price: number; url: string; } | null>>({});
-  const [beatportPrices, setBeatportPrices] = useState<Record<string, { price: number; url: string; } | null>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [songPrices, setSongPrices] = useState<Record<string, { itunesPrice: number; itunesUrl: string; beatPortPrice: number; beatPortUrl: string; bandCampPrice: number; bandCampUrl: string; } | null>>({})
   const [loading, setLoading] = useState(false);
@@ -89,7 +86,6 @@ const PlaylistTable = ({
           withCredentials: true,
         });
         const data = response.data;
-        // setLoggedIn(true);
         setUser({
           display_name: data.display_name,
           profile_picture: data.profile_picture,
@@ -154,87 +150,6 @@ const fetchSongPrices = async () => {
     setLoading(false);
   }
 };
-
-  // const fetchItunesPrices = async () => {
-  //   if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
-
-  //   try {
-  //     const response = await axios.post("http://localhost:5000/itunes_result", {
-  //       tracks: tracks[selectedPlaylist],
-  //     }, {
-  //       withCredentials: true,
-  //     });
-  //     const data = response.data;
-  //     console.log("Raw iTunes price response:", data);
-
-  //     const priceMap: Record<string, { price: number; url: string } | null> = {};
-  //     data.forEach((item: any) => {
-  //       if (item.price !== undefined && item.url) {
-  //         priceMap[item.name] = { price: item.price, url: item.url };
-  //       } else {
-  //         priceMap[item.name] = null;
-  //       }
-  //     });
-
-  //     setItunesPrices(priceMap);
-  //   } catch (error) {
-  //     console.error("Error fetching iTunes prices:", error);
-  //   }
-  // };
-
-  // const fetchBandcampPrices = async () => {
-  //   if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
-
-  //   try {
-  //     const response = await axios.post("http://localhost:5000/bandcamp_results", {
-  //       tracks: tracks[selectedPlaylist],
-  //     }, {
-  //       withCredentials: true,
-  //     });
-  //     const data = response.data;
-  //     console.log("Full bandcamp prices data:", data);
-
-  //     const pricesMap: Record<string, { price: number; url: string } | null> = {};
-  //     data.forEach((item: any) => {
-  //       if (item.price !== undefined && item.url) {
-  //         pricesMap[item.name] = { price: item.price, url: item.url };
-  //       } else {
-  //         pricesMap[item.name] = null;
-  //       }
-  //     });
-
-  //     setBandCampPrices(pricesMap);
-  //   } catch (error) {
-  //     console.error("Error fetching prices", error);
-  //   }
-  // };
-
-  // const fetchBeatportPrices = async () => {
-  //   if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
-
-  //   try {
-  //     const response = await axios.post("http://localhost:5000/beatport_results", {
-  //       tracks: tracks[selectedPlaylist],
-  //     }, {
-  //       withCredentials: true,
-  //     });
-  //     const data = response.data;
-  //     console.log("Full Beatport prices data:", data);
-
-  //     const pricesMap: Record<string, { price: number; url: string } | null> = {};
-  //     data.forEach((item: any) => {
-  //       if (item.price !== undefined && item.url) {
-  //         pricesMap[item.name] = { price: item.price, url: item.url };
-  //       } else {
-  //         pricesMap[item.name] = null;
-  //       }
-  //     });
-
-  //     setBeatportPrices(pricesMap);
-  //   } catch (error) {
-  //     console.error("Error fetching prices", error);
-  //   }
-  // };
 
   return (
     <div>
@@ -431,9 +346,6 @@ const fetchSongPrices = async () => {
                 color="grape"
                 onClick={async () => {
                   if (showTrackTable) {
-                    // await fetchBandcampPrices();
-                    // await fetchItunesPrices();
-                    // await fetchBeatportPrices();
                     await fetchSongPrices();
                     setTrackTable(false);
                     setPriceTable(true);
