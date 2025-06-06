@@ -14,7 +14,8 @@ import {
 } from "@mantine/core";
 import { motion, AnimatePresence } from "framer-motion";
 
-import classes from '../PlaylistTable/PlaylistTable.module.css'
+import classes from '../PlaylistTable/PlaylistTable.module.css';
+import LoadingRipple from "../LoadingAnimation/LoadingRipple";
 
 import type { Playlist } from "../../types/types";
 
@@ -42,6 +43,7 @@ const PlaylistTable = ({
   const [beatportPrices, setBeatportPrices] = useState<Record<string, { price: number; url: string; } | null>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [songPrices, setSongPrices] = useState<Record<string, { itunesPrice: number; itunesUrl: string; beatPortPrice: number; beatPortUrl: string; bandCampPrice: number; bandCampUrl: string; } | null>>({})
+  const [loading, setLoading] = useState(false);
 
   const theme = useMantineTheme();
 
@@ -101,140 +103,138 @@ const PlaylistTable = ({
     fetchPlaylists();
   }, []);
 
-  const fetchTracks = async (playlistId: string) => {
-    if (tracks[playlistId]) {
-      setSelectedPlaylist(playlistId);
-      setModalOpened(true);
-      return;
-    }
-
-    try {
-      const response = await axios.get(`http://localhost:5000/get_tracks/${playlistId}`, {
-        withCredentials: true,
-      });
-      const data: Track[] = response.data;
-      setTracks((prev) => ({ ...prev, [playlistId]: data }));
-      setSelectedPlaylist(playlistId);
-      setModalOpened(true);
-      setTrackTable(true);
-    } catch (error) {
-      console.error("Error fetching tracks:", error);
-    }
-  };
-
-
-  const fetchSongPrices = async () => {
-    if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
-
-    try {
-      const response = await axios.post("http://localhost:5000/db_results", {
-        tracks: tracks[selectedPlaylist]
-      }, {
-        withCredentials: true,
-
-      });
-      const data = response.data;
-      console.log("Full song Data: ", data);
-
-      const priceMap: Record<string, { itunesPrice: number; itunesUrl: string; beatPortPrice: number; beatPortUrl: string; bandCampPrice: number; bandCampUrl: string; } | null> = {};
-
-      data.forEach((item: any) => {
-        if (item.track_name && item.artist) {
-          priceMap[item.track_name] = {
-            itunesPrice: item.itunes_price, itunesUrl: item.itunes_url,
-            bandCampPrice: item.bandcamp_price, bandCampUrl: item.bandcamp_url,
-            beatPortPrice: item.beatport_price, beatPortUrl: item.beatport_url
-          };
-        }
-
-      });
-      setSongPrices(priceMap);
-
-    } catch (error) {
-      console.error("Error fetching song prices: ", error);
-    }
+const fetchTracks = async (playlistId: string) => {
+  if (tracks[playlistId]) {
+    setTrackTable(true);
+    return;
   }
+  setLoading(true);
+  try {
+    const response = await axios.get(`http://localhost:5000/get_tracks/${playlistId}`, {
+      withCredentials: true,
+    });
+    const data: Track[] = response.data;
+    setTracks((prev) => ({ ...prev, [playlistId]: data }));
+    setTrackTable(true);
+  } catch (error) {
+    console.error("Error fetching tracks:", error);
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const fetchItunesPrices = async () => {
-    if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
+const fetchSongPrices = async () => {
+  if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
+  setLoading(true);
+  try {
+    const response = await axios.post("http://localhost:5000/db_results", {
+      tracks: tracks[selectedPlaylist],
+    }, { withCredentials: true });
 
-    try {
-      const response = await axios.post("http://localhost:5000/itunes_result", {
-        tracks: tracks[selectedPlaylist],
-      }, {
-        withCredentials: true,
-      });
-      const data = response.data;
-      console.log("Raw iTunes price response:", data);
+    const data = response.data;
+    const priceMap: Record<string, { itunesPrice: number; itunesUrl: string; beatPortPrice: number; beatPortUrl: string; bandCampPrice: number; bandCampUrl: string; } | null> = {};
 
-      const priceMap: Record<string, { price: number; url: string } | null> = {};
-      data.forEach((item: any) => {
-        if (item.price !== undefined && item.url) {
-          priceMap[item.name] = { price: item.price, url: item.url };
-        } else {
-          priceMap[item.name] = null;
-        }
-      });
+    data.forEach((item: any) => {
+      if (item.track_name && item.artist) {
+        priceMap[item.track_name] = {
+          itunesPrice: item.itunes_price,
+          itunesUrl: item.itunes_url,
+          bandCampPrice: item.bandcamp_price,
+          bandCampUrl: item.bandcamp_url,
+          beatPortPrice: item.beatport_price,
+          beatPortUrl: item.beatport_url,
+        };
+      }
+    });
 
-      setItunesPrices(priceMap);
-    } catch (error) {
-      console.error("Error fetching iTunes prices:", error);
-    }
-  };
+    setSongPrices(priceMap);
+  } catch (error) {
+    console.error("Error fetching song prices: ", error);
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const fetchBandcampPrices = async () => {
-    if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
+  // const fetchItunesPrices = async () => {
+  //   if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
 
-    try {
-      const response = await axios.post("http://localhost:5000/bandcamp_results", {
-        tracks: tracks[selectedPlaylist],
-      }, {
-        withCredentials: true,
-      });
-      const data = response.data;
-      console.log("Full bandcamp prices data:", data);
+  //   try {
+  //     const response = await axios.post("http://localhost:5000/itunes_result", {
+  //       tracks: tracks[selectedPlaylist],
+  //     }, {
+  //       withCredentials: true,
+  //     });
+  //     const data = response.data;
+  //     console.log("Raw iTunes price response:", data);
 
-      const pricesMap: Record<string, { price: number; url: string } | null> = {};
-      data.forEach((item: any) => {
-        if (item.price !== undefined && item.url) {
-          pricesMap[item.name] = { price: item.price, url: item.url };
-        } else {
-          pricesMap[item.name] = null;
-        }
-      });
+  //     const priceMap: Record<string, { price: number; url: string } | null> = {};
+  //     data.forEach((item: any) => {
+  //       if (item.price !== undefined && item.url) {
+  //         priceMap[item.name] = { price: item.price, url: item.url };
+  //       } else {
+  //         priceMap[item.name] = null;
+  //       }
+  //     });
 
-      setBandCampPrices(pricesMap);
-    } catch (error) {
-      console.error("Error fetching prices", error);
-    }
-  };
+  //     setItunesPrices(priceMap);
+  //   } catch (error) {
+  //     console.error("Error fetching iTunes prices:", error);
+  //   }
+  // };
 
-  const fetchBeatportPrices = async () => {
-    if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
+  // const fetchBandcampPrices = async () => {
+  //   if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
 
-    try {
-      const response = await axios.post("http://localhost:5000/beatport_results", {
-        tracks: tracks[selectedPlaylist],
-      }, {
-        withCredentials: true,
-      });
-      const data = response.data;
-      console.log("Full Beatport prices data:", data);
+  //   try {
+  //     const response = await axios.post("http://localhost:5000/bandcamp_results", {
+  //       tracks: tracks[selectedPlaylist],
+  //     }, {
+  //       withCredentials: true,
+  //     });
+  //     const data = response.data;
+  //     console.log("Full bandcamp prices data:", data);
 
-      const pricesMap: Record<string, { price: number; url: string } | null> = {};
-      data.forEach((item: any) => {
-        if (item.price !== undefined && item.url) {
-          pricesMap[item.name] = { price: item.price, url: item.url };
-        } else {
-          pricesMap[item.name] = null;
-        }
-      });
+  //     const pricesMap: Record<string, { price: number; url: string } | null> = {};
+  //     data.forEach((item: any) => {
+  //       if (item.price !== undefined && item.url) {
+  //         pricesMap[item.name] = { price: item.price, url: item.url };
+  //       } else {
+  //         pricesMap[item.name] = null;
+  //       }
+  //     });
 
-      setBeatportPrices(pricesMap);
-    } catch (error) {
-      console.error("Error fetching prices", error);
-    }
-  };
+  //     setBandCampPrices(pricesMap);
+  //   } catch (error) {
+  //     console.error("Error fetching prices", error);
+  //   }
+  // };
+
+  // const fetchBeatportPrices = async () => {
+  //   if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
+
+  //   try {
+  //     const response = await axios.post("http://localhost:5000/beatport_results", {
+  //       tracks: tracks[selectedPlaylist],
+  //     }, {
+  //       withCredentials: true,
+  //     });
+  //     const data = response.data;
+  //     console.log("Full Beatport prices data:", data);
+
+  //     const pricesMap: Record<string, { price: number; url: string } | null> = {};
+  //     data.forEach((item: any) => {
+  //       if (item.price !== undefined && item.url) {
+  //         pricesMap[item.name] = { price: item.price, url: item.url };
+  //       } else {
+  //         pricesMap[item.name] = null;
+  //       }
+  //     });
+
+  //     setBeatportPrices(pricesMap);
+  //   } catch (error) {
+  //     console.error("Error fetching prices", error);
+  //   }
+  // };
 
   return (
     <div>
@@ -264,8 +264,11 @@ const PlaylistTable = ({
                             className={classes.cardContent}
                             shadow="sm"
                             padding="lg"
-                            onClick={() => fetchTracks(playlist.id)}
-
+                            onClick={() => {
+                              setSelectedPlaylist(playlist.id);
+                              setModalOpened(true);
+                              fetchTracks(playlist.id);
+                            }}
                           >
                             <Card.Section>
                               <Image
@@ -343,8 +346,11 @@ const PlaylistTable = ({
             }}
           >
 
-            <div style={{ flex: 1, overflowY: "auto", paddingBottom: "60px" }}>
-              {showTrackTable && selectedPlaylist && tracks[selectedPlaylist] ? (
+          <div style={{ flex: 1, overflowY: "auto", paddingBottom: "60px" }}>
+            {loading ? (
+              <LoadingRipple />
+            ) : selectedPlaylist && tracks[selectedPlaylist] && tracks[selectedPlaylist].length > 0 ? (
+              showTrackTable ? (
                 <Table>
                   <Table.Thead>
                     <Table.Tr>
@@ -364,10 +370,6 @@ const PlaylistTable = ({
                   </Table.Tbody>
                 </Table>
               ) : (
-                <Text>No tracks available</Text>
-              )}
-
-              {showPriceTable && selectedPlaylist && tracks[selectedPlaylist] ? (
                 <Table>
                   <Table.Thead>
                     <Table.Tr>
@@ -378,76 +380,40 @@ const PlaylistTable = ({
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-
                     {tracks[selectedPlaylist].map((track, index) => (
                       <Table.Tr key={index}>
                         <Table.Td>{track.name}</Table.Td>
-
-                        {/* Bandcamp Prices */}
+                        {/* Price columns */}
                         <Table.Td>
-                          {(songPrices[track.name]) ? (
-                            <a
-                              href={songPrices[track.name]?.bandCampUrl ? songPrices[track.name]?.bandCampUrl : "#"}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: "#007aff", textDecoration: "none" }}
-                            >
-                              {songPrices[track.name]?.bandCampPrice !== null
-                                ? `$${songPrices[track.name]?.bandCampPrice}`
-                                : "$--"}
-
+                          {songPrices[track.name] ? (
+                            <a href={songPrices[track.name]?.bandCampUrl ?? "#"}>
+                              {songPrices[track.name]?.bandCampPrice ?? "$--"}
                             </a>
-                          ) : (
-                            ""
-                          )}
+                          ) : ""}
                         </Table.Td>
-
-
-
-                        {/* Beatport Prices */}
                         <Table.Td>
-                          {(songPrices[track.name]) ? (
-                            <a
-                              href={songPrices[track.name]?.beatPortUrl ? songPrices[track.name]?.beatPortUrl : "#"}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: "#007aff", textDecoration: "none" }}
-                            >
-                              {songPrices[track.name]?.beatPortPrice !== null
-                                ? `$${songPrices[track.name]?.beatPortPrice}`
-                                : "$--"}
+                          {songPrices[track.name] ? (
+                            <a href={songPrices[track.name]?.beatPortUrl ?? "#"}>
+                              {songPrices[track.name]?.beatPortPrice ?? "$--"}
                             </a>
-                          ) : (
-                            ""
-                          )}
+                          ) : ""}
                         </Table.Td>
-
-                        {/* Itunes Prices */}
                         <Table.Td>
-                          {(songPrices[track.name]) ? (
-                            <a
-                              href={songPrices[track.name]?.itunesUrl ? songPrices[track.name]?.itunesUrl : "#"}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: "#007aff", textDecoration: "none" }}
-                            >
-                              {songPrices[track.name]?.itunesPrice !== null
-                                ? `$${songPrices[track.name]?.itunesPrice}`
-                                : "$--"}
+                          {songPrices[track.name] ? (
+                            <a href={songPrices[track.name]?.itunesUrl ?? "#"}>
+                              {songPrices[track.name]?.itunesPrice ?? "$--"}
                             </a>
-                          ) : (
-                            ""
-                          )}
+                          ) : ""}
                         </Table.Td>
-
                       </Table.Tr>
                     ))}
                   </Table.Tbody>
                 </Table>
-              ) : (
-                <Text>No tracks available</Text>
-              )}
-            </div>
+              )
+            ) : (
+              <Text>No tracks available</Text>
+            )}
+          </div>
 
             <div style={{
               position: "absolute",
@@ -465,9 +431,9 @@ const PlaylistTable = ({
                 color="grape"
                 onClick={async () => {
                   if (showTrackTable) {
-                    await fetchBandcampPrices();
-                    await fetchItunesPrices();
-                    await fetchBeatportPrices();
+                    // await fetchBandcampPrices();
+                    // await fetchItunesPrices();
+                    // await fetchBeatportPrices();
                     await fetchSongPrices();
                     setTrackTable(false);
                     setPriceTable(true);

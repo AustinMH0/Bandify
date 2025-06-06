@@ -5,7 +5,7 @@ import { Button, Container, Group, Avatar, ActionIcon, Popover, Text } from '@ma
 import { IconBrandSpotify } from "@tabler/icons-react";
 
 import classes from './Header.module.css';
-import { ReactComponent as BandifyLogo } from '../../assets/bandify.svg';
+import { ReactComponent as GroovonomyLogo } from '../../assets/groovonomy.svg';
 
 interface HeaderProps {
   user: { display_name: string; profile_picture: string | null } | null;
@@ -27,7 +27,7 @@ const Header: React.FC<HeaderProps> = ({ user, showLoginCard, setShowLoginCard }
       <div className={`${classes.blob} ${classes.blob2} ${showLoginCard ? classes.greenMode : ""}`} />
       <Container fluid size="lg" className={classes.inner}>
 
-        <BandifyLogo className={classes.logo}/>
+        <GroovonomyLogo className={classes.logo}/>
 
         <Group visibleFrom="sm">
 
@@ -41,7 +41,7 @@ const Header: React.FC<HeaderProps> = ({ user, showLoginCard, setShowLoginCard }
           </Button>
 
           <AnimatePresence mode="wait">
-            {!user && ( // ⬅️ Only show login buttons if user is not logged in
+            {!user && ( 
               showLoginCard ? (
                 <MotionDiv className={classes.getStarted}
                   key="login-button"
