@@ -1,9 +1,14 @@
 export interface Playlist {
+  id: string;
+  name: string;
+  image: string | null;
+  total_tracks: number;
+  owner?: {
     id: string;
-    name: string;
-    total_tracks: number;
-    image: string | null;
-  }
+    display_name?: string;
+  };
+}
+
   
   export interface User {
     display_name: string;
