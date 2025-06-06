@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import MetaData, insert, tuple_
 from sqlalchemy.ext.automap import automap_base
 from flask import jsonify, request, Blueprint
-from itertools import chain
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import datetime
 from ..search import BeatportSearch
@@ -79,6 +79,7 @@ def get_db_result():
         # print("=" * 50)
         # print(artists)
         # print("=" * 50)
+
         # "results" holds the query results
         with Session(engine) as sesh, sesh.begin():
             query = sesh.query(Track).filter(tuple_(Track.artist, Track.track_name).in_(zip(artists, song_names)))
@@ -94,26 +95,44 @@ def get_db_result():
                     'beatport_url': track.beatport_url}
 
             final_data = []
-            new_song_data = []
+            new_tracks_to_search= []
 
-
+            # Separate tracks NOT in DB
             for song in tracks:
 
                 artist, track_name = song['artist'], song['name']
                 songData = db_dict.get((track_name, artist), None)
 
                 if songData is None:
-                    songData = getApiPrices(artist, track_name)
-                    new_song_data.append(songData)
+                    new_tracks_to_search.append((artist, track_name))
+                else:
+                    songData['track_name'], songData['artist'] = track_name, artist
+                    final_data.append(songData)
 
-                # SongData dict in new_song_data dict is being updated due to reference 
-                songData['track_name'], songData['artist'] = track_name, artist
-                final_data.append(songData)
+            # Multithread
+            new_song_data = []
+            with ThreadPoolExecutor(max_workers=6) as executor:
+                future_to_track = {
+                    executor.submit(getApiPrices, artist, track_name): (artist, track_name)
+                    for artist, track_name in new_tracks_to_search
+                }
+
+                for future in as_completed(future_to_track):
+                    artist, track_name = future_to_track[future]
+                    try:
+                        songData = future.result()
+                        songData['track_name'], songData['artist'] = track_name, artist
+                        final_data.append(songData)
+                        new_song_data.append(songData)
+                    except Exception as e:
+                        print(f"API search failed for {track_name} by {artist}: {e}")
+                
 
         if new_song_data:
             # print(new_song_data)
             sesh.execute(insert(Track), new_song_data)
             sesh.commit()
+
     # print("="*50)
     # print(list(final_data))
 
