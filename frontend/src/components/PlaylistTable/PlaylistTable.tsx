@@ -41,8 +41,8 @@ const PlaylistTable = ({
   const [tableButton, setTableButton] = useState("View Prices");
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [filterOption, setFilterOption] = useState<"all" | "user">("all");
-  const [sortOption, setSortOption] = useState<string>("recent");
+  // const [filterOption, setFilterOption] = useState<"all" | "user">("all");
+  // const [sortOption, setSortOption] = useState<string>("recent");
   const [songPrices, setSongPrices] = useState<
     Record<
       string,
@@ -197,15 +197,12 @@ const PlaylistTable = ({
                 exit="exit"
               >
                 <PlaylistSort
-                  playlists={playlists}
-                  setPlaylists={setPlaylists}
-                  originalPlaylists={originalPlaylists}
-                  userId={user?.id}
-                  filterOption={filterOption}
-                  setFilterOption={setFilterOption}
-                  sortOption={sortOption}
-                  setSortOption={setSortOption}
-                />
+  playlists={playlists}
+  setPlaylists={setPlaylists}
+  originalPlaylists={originalPlaylists}
+  userId={user?.id}
+/>
+
                 <Grid mt="md">
                   {playlists
                     .slice((currentPage - 1) * 9, currentPage * 9)

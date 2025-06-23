@@ -1,5 +1,6 @@
 import { Select } from "@mantine/core";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useLocalStorage } from "@mantine/hooks"; // ✅ Import the hook
 import type { Playlist } from "../../types/types";
 
 interface PlaylistSortProps {
@@ -7,10 +8,6 @@ interface PlaylistSortProps {
   setPlaylists: React.Dispatch<React.SetStateAction<Playlist[]>>;
   originalPlaylists: Playlist[];
   userId: string | undefined;
-  filterOption: "all" | "user";
-  setFilterOption: React.Dispatch<React.SetStateAction<"all" | "user">>;
-  sortOption: string;
-  setSortOption: React.Dispatch<React.SetStateAction<string>>;
 }
 
 const PlaylistSort = ({
@@ -19,66 +16,75 @@ const PlaylistSort = ({
   originalPlaylists,
   userId,
 }: PlaylistSortProps) => {
-  const [filterOption, setFilterOption] = useState<"all" | "user">("all"); 
-  const [sortOption, setSortOption] = useState<string | null>("recent");
+  // ✅ Use local storage for filter and sort options
+  const [filterOption, setFilterOption] = useLocalStorage<"all" | "user">({
+    key: "playlist-filter",
+    defaultValue: "all",
+  });
 
-useEffect(() => {
-  let filtered = [...originalPlaylists];
+  const [sortOption, setSortOption] = useLocalStorage<string>({
+    key: "playlist-sort",
+    defaultValue: "recent",
+  });
 
-  if (filterOption === "user") {
-    filtered = filtered.filter(p => p.owner?.id === userId);
-  }
+  useEffect(() => {
+    let filtered = [...originalPlaylists];
 
-  switch (sortOption) {
-    case "name-asc":
-      filtered.sort((a, b) => a.name.localeCompare(b.name));
-      break;
-    case "name-desc":
-      filtered.sort((a, b) => b.name.localeCompare(a.name));
-      break;
-    case "oldest":
-      filtered.reverse();
-      break;
-    case "recent":
-    default:
-      break;
-  }
+    if (filterOption === "user") {
+      filtered = filtered.filter((p) => p.owner?.id === userId);
+    }
 
-  setPlaylists(filtered);
-}, [sortOption, filterOption, originalPlaylists]);
+    switch (sortOption) {
+      case "name-asc":
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case "name-desc":
+        filtered.sort((a, b) => b.name.localeCompare(a.name));
+        break;
+      case "oldest":
+        filtered.reverse();
+        break;
+      case "recent":
+      default:
+        break;
+    }
 
+    setPlaylists(filtered);
+  }, [sortOption, filterOption, originalPlaylists, userId]);
 
   return (
     <div style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
-    <Select
+      <Select
         label="Sort by"
         value={sortOption}
-        onChange={setSortOption}
+        onChange={(value) => {
+          if (value) setSortOption(value);
+        }}
         data={[
-        { value: "recent", label: "Recently Added" },
-        { value: "name-asc", label: "Name (A–Z)" },
-        { value: "name-desc", label: "Name (Z–A)" },
-        { value: "oldest", label: "Oldest" },
+          { value: "recent", label: "Recently Added" },
+          { value: "name-asc", label: "Name (A–Z)" },
+          { value: "name-desc", label: "Name (Z–A)" },
+          { value: "oldest", label: "Oldest" },
         ]}
         clearable={false}
         maw={200}
-    />
+      />
 
-    <Select
+      <Select
         label="Filter"
         value={filterOption}
         onChange={(value) => {
-            if (value && ["user", "all"].includes(value)) {
-                setFilterOption(value as "user" | "all");
-            }
+          if (value === "user" || value === "all") {
+            setFilterOption(value);
+          }
         }}
         data={[
-            { value: "all", label: "All Playlists" },
-            { value: "user", label: "Your Playlists" },
+          { value: "all", label: "All Playlists" },
+          { value: "user", label: "Your Playlists" },
         ]}
         clearable={false}
         maw={200}
-    />
+      />
     </div>
   );
 };
