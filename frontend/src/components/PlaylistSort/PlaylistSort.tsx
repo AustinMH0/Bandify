@@ -11,7 +11,6 @@ interface PlaylistSortProps {
 }
 
 const PlaylistSort = ({
-  playlists,
   setPlaylists,
   originalPlaylists,
   userId,
@@ -55,23 +54,21 @@ const PlaylistSort = ({
   return (
     <div style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
       <Select
-        label="Sort by"
         value={sortOption}
         onChange={(value) => {
           if (value) setSortOption(value);
         }}
         data={[
           { value: "recent", label: "Recently Added" },
+          { value: "oldest", label: "Oldest" },
           { value: "name-asc", label: "Name (A–Z)" },
           { value: "name-desc", label: "Name (Z–A)" },
-          { value: "oldest", label: "Oldest" },
         ]}
         clearable={false}
         maw={200}
       />
 
       <Select
-        label="Filter"
         value={filterOption}
         onChange={(value) => {
           if (value === "user" || value === "all") {
