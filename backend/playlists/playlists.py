@@ -67,12 +67,17 @@ def get_playlists():
             'id': playlist['id'],
             'name': playlist['name'],
             'total_tracks': playlist['tracks']['total'],
-            'image': playlist['images'][0]['url'] if playlist['images'] else None
+            'image': playlist['images'][0]['url'] if playlist['images'] else None,
+            'owner': {
+                'id': playlist['owner']['id'],
+                'display_name': playlist['owner']['display_name']
+            }
         }
-        for playlist in playlists['items'] if playlist['owner']['id'] == user_id
+        for playlist in playlists['items']
     ]
 
     return jsonify({
+        'id': user_id,
         'display_name': user_info['display_name'],
         'profile_picture': profile_pic,
         'playlists': result
