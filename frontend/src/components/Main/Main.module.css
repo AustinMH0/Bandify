@@ -1,22 +1,25 @@
 .wrapper {
     position: relative;
-    padding-top: 64px;
+    padding-top: 0px;
     padding-bottom: 130px;
     z-index: 0;
+    width: 100vw;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
     /* background-image: url('./src/assets/lava_background.jpg');
     background-size: contain;
     background-position: center;
     max-width: 100%;
     max-height: 100%; */
-    width: 100vw;
-    height: 100vh;
+
     /* background: #2b2a33; */
     /* background-size: cover; */
   
-    /* @media (max-width: $mantine-breakpoint-xs) {
+    @media (max-width: $mantine-breakpoint-xs) {
       padding-top: 80px;
       padding-bottom: 50px;
-    } */
+    }
   }
   
   .inner {
@@ -92,4 +95,28 @@
     @mixin hover {
       background-color: rgba(255, 255, 255, 0.45);
     }
+  }
+
+  .blob {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(100px);
+    opacity: 0.5;
+    z-index: -1;
+  }
+  
+  .blob1 {
+    width: 300px;
+    height: 300px;
+    background: #f5c7f7;
+    top: -100px;
+    left: -100px;
+  }
+  
+  .blob2 {
+    width: 300px;
+    height: 300px;
+    background: #da77f2;
+    bottom: -100px;
+    right: -100px;
   }
