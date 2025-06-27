@@ -1,0 +1,62 @@
+name: Build and Deploy SAM with Poetry
+
+on:
+  push:
+    branches:
+      - main
+
+defaults:
+  run:
+    working-directory: ./backend/infrastructure/sam_app
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies with Poetry
+        run: poetry install
+
+      - name: Export requirements.txt for SAM build
+        run: poetry export -f requirements.txt --output search_results/requirements.txt --without-hashes
+
+      - name: Set up AWS SAM
+        uses: aws-actions/setup-sam@v1
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubOIDCSAMDeployRole
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Build SAM app
+        run: sam build --use-container
+
+      - name: Deploy SAM app
+        run: |
+          sam deploy \
+            --debug \
+            --config-file samconfig.toml \
+            --no-fail-on-empty-changeset \
+            --region ${{ secrets.AWS_REGION }} \
+            --s3-bucket ${{ secrets.AWS_S3_BUCKET }} \
+            --parameter-overrides \
+              "DbUrl=${{ secrets.DB_URL }}" \
+              "S3BucketName=${{ secrets.AWS_S3_BUCKET }}"
