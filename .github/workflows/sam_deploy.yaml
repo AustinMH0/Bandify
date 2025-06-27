@@ -27,10 +27,12 @@ jobs:
           python-version: '3.11'
 
       - name: Install Poetry
-        run: snok/install-poetry@v1
-
-      - name: Install dependencies with Poetry (no-root)
-        run: poetry install --no-root
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.2
+      
+      - name: Export dependencies
+        run: poetry export -f requirements.txt --output search_results/requirements.txt --without-hashes
 
       - name: Export requirements.txt for SAM build
         run: poetry export -f requirements.txt --output search_results/requirements.txt --without-hashes
