@@ -26,6 +26,11 @@ jobs:
         with:
           node-version: 20
           
+      - name: Print GitHub Context
+        run: |
+              echo "GITHUB_REF: $GITHUB_REF"
+              echo "GITHUB_REPOSITORY: $GITHUB_REPOSITORY"
+
       - name: Set AWS role ARN
         run: echo "ROLE_ARN=arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubOIDCFrontendDeployRole" >> $GITHUB_ENV
 
