@@ -7,7 +7,7 @@ on:
 
 defaults:
   run:
-    working-directory: ./backend/infrastructure/sam_app
+    working-directory: ./backend/infrastructure/sam-app
 
 permissions:
   id-token: write
