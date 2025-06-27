@@ -10,21 +10,27 @@ Parameters:
     Type: String
     Description: The full connection URL for the Postgres DB
 
+  S3BucketName:
+    Type: String
+    Description: Name of the S3 bucket this Lambda function will access
+
 Globals:
   Function:
     Timeout: 3
     Tracing: Active
     LoggingConfig:
       LogFormat: JSON
+    Tags:
+      Project: Groovonomy
+      Environment: Production
+
   Api:
     TracingEnabled: true
 
 Resources:
-  # Custom IAM Role for Lambda
   SearchResultsExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: search-results-exec-role
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -42,15 +48,16 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: arn:aws:logs:*:*:*
+                Resource: arn:aws:logs:*:*:log-group:/aws/lambda/*
               - Effect: Allow
                 Action:
                   - s3:GetObject
                   - s3:PutObject
                   - s3:ListBucket
-                Resource: "*"
+                Resource:
+                  - !Sub arn:aws:s3:::${S3BucketName}
+                  - !Sub arn:aws:s3:::${S3BucketName}/*
 
-  # Lambda Function with Explicit Role
   SearchResultsFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -69,30 +76,31 @@ Resources:
       Environment:
         Variables:
           DB_URL: !Ref DbUrl
+      Tags:
+        FunctionPurpose: SearchResults
 
-  # Monitoring Resources
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
     Properties:
-      Name:
-        Fn::Sub: ApplicationInsights-SAM-${AWS::StackName}
+      Name: !Sub ApplicationInsights-SAM-${AWS::StackName}
       ResourceQuery:
         Type: CLOUDFORMATION_STACK_1_0
 
   ApplicationInsightsMonitoring:
     Type: AWS::ApplicationInsights::Application
     Properties:
-      ResourceGroupName:
-        Ref: ApplicationResourceGroup
+      ResourceGroupName: !Ref ApplicationResourceGroup
       AutoConfigurationEnabled: 'true'
 
 Outputs:
   SearchResultsApi:
     Description: API Gateway endpoint URL for Prod stage for Search Results function
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/db_results/"
+
   SearchResultsFunction:
     Description: Search Results Lambda Function ARN
     Value: !GetAtt SearchResultsFunction.Arn
+
   SearchResultsFunctionIamRole:
     Description: Custom IAM Role used by Search Results function
     Value: !GetAtt SearchResultsExecutionRole.Arn
