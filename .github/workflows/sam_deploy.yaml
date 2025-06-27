@@ -54,7 +54,6 @@ jobs:
             --config-file samconfig.toml \
             --no-fail-on-empty-changeset \
             --region ${{ secrets.AWS_REGION }} \
-            --s3-bucket ${{ secrets.AWS_S3_BUCKET }} \
             --parameter-overrides \
               "DbUrl=${{ secrets.DB_URL }}" \
               "S3BucketName=${{ secrets.AWS_S3_BUCKET }}"
