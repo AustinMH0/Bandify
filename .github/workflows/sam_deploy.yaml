@@ -33,6 +33,8 @@ jobs:
       
       - name: Export dependencies
         run: poetry export -f requirements.txt --output search_results/requirements.txt --without-hashes
+        working-directory: backend/infrastructure/sam-app
+
 
       - name: Export requirements.txt for SAM build
         run: poetry export -f requirements.txt --output search_results/requirements.txt --without-hashes
