@@ -5,7 +5,6 @@ description = ""
 authors = ["AustinMH0 <austinmhendricks@gmail.com>"]
 readme = "README.md"
 packages = [{ include = "search_results" }]
-python = "^3.11"
 
 [tool.poetry.dependencies]
 python = "^3.11"
