@@ -25,11 +25,14 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: 20
+          
+      - name: Set AWS role ARN
+        run: echo "ROLE_ARN=arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubOIDCFrontendDeployRole" >> $GITHUB_ENV
 
       - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: ${{ format('arn:aws:iam::{}:role/GitHubOIDCFrontendDeployRole', secrets.AWS_ACCOUNT_ID) }}
+          role-to-assume: ${{ env.ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: npm ci, build and test
