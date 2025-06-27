@@ -32,12 +32,12 @@ jobs:
           version: 1.8.2
       
       - name: Export dependencies
-        run: poetry export -f requirements.txt --output search_results/requirements.txt --without-hashes
+        run: poetry export -f requirements.txt --output requirements.txt --without-hashes
         working-directory: backend/infrastructure/sam-app
 
 
       - name: Export requirements.txt for SAM build
-        run: poetry export -f requirements.txt --output search_results/requirements.txt --without-hashes
+        run: poetry export -f requirements.txt --output requirements.txt --without-hashes
 
       - name: Set up AWS SAM
         uses: aws-actions/setup-sam@v1
