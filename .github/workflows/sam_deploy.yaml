@@ -55,7 +55,11 @@ jobs:
         run: |
           sam deploy \
             --debug \
-            --config-file samconfig.toml \
-            --no-fail-on-empty-changeset \
+            --stack-name aws-sam-cli-managed-default \
             --region $AWS_REGION \
-            --parameter-overrides DbUrl=$DB_URL S3BucketName=$AWS_S3_BUCKET
+            --capabilities CAPABILITY_IAM \
+            --s3-bucket $AWS_S3_BUCKET \
+            --s3-prefix sam-artifacts \
+            --parameter-overrides DbUrl=$DB_URL S3BucketName=$AWS_S3_BUCKET \
+            --no-confirm-changeset \
+            --resolve-s3 false
