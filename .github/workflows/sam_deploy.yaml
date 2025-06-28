@@ -62,4 +62,3 @@ jobs:
             --s3-prefix sam-artifacts \
             --parameter-overrides DbUrl=$DB_URL S3BucketName=$AWS_S3_BUCKET \
             --no-confirm-changeset \
-            --resolve-s3 false
