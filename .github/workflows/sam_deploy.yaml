@@ -48,12 +48,14 @@ jobs:
         run: sam build --use-container
 
       - name: Deploy SAM app
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           sam deploy \
             --debug \
             --config-file samconfig.toml \
             --no-fail-on-empty-changeset \
-            --region ${{ secrets.AWS_REGION }} \
-            --parameter-overrides \
-              "DbUrl=${{ secrets.DB_URL }}" \
-              "S3BucketName=${{ secrets.AWS_S3_BUCKET }}"
+            --region $AWS_REGION \
+            --parameter-overrides DbUrl=$DB_URL S3BucketName=$AWS_S3_BUCKET
