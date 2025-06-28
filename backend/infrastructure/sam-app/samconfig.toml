@@ -2,7 +2,7 @@ version = 0.1
 
 [default.global.parameters]
 stack_name = "aws-sam-cli-managed-default"
-region = "us-west-1"
+region = ""
 
 [default.build.parameters]
 cached = true
@@ -16,9 +16,9 @@ lint = true
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = false
 resolve_s3 = false
-s3_bucket = "my-existing-sam-bucket-name"  
+s3_bucket = ""
 s3_prefix = "sam-artifacts"
 parameter_overrides = [
-  "DbUrl=my-db-url",
-  "S3BucketName=my-existing-sam-bucket-name"
+  "DbUrl=placeholder-db-url",
+  "S3BucketName=placeholder-bucket-name"
 ]
