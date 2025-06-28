@@ -16,9 +16,9 @@ lint = true
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = false
 resolve_s3 = false
-s3_bucket = "${{ secrets.AWS_S3_BUCKET }}"
+s3_bucket = "my-existing-sam-bucket-name"  
 s3_prefix = "sam-artifacts"
 parameter_overrides = [
-  "DbUrl=${{ secrets.DB_URL }}",
-  "S3BucketName=${{ secrets.AWS_S3_BUCKET }}"
+  "DbUrl=my-db-url",
+  "S3BucketName=my-existing-sam-bucket-name"
 ]
