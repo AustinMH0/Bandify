@@ -62,3 +62,10 @@ jobs:
             --s3-prefix sam-artifacts \
             --parameter-overrides DbUrl=$DB_URL S3BucketName=$AWS_S3_BUCKET \
             --no-confirm-changeset \
+
+      - name: Dump CloudFormation stack events
+        run: |
+          aws cloudformation describe-stack-events \
+            --stack-name aws-sam-cli-managed-default \
+            --region ${{ secrets.AWS_REGION }} \
+            --max-items 20
