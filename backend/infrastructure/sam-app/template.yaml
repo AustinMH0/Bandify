@@ -79,19 +79,6 @@ Resources:
       Tags:
         FunctionPurpose: SearchResults
 
-  ApplicationResourceGroup:
-    Type: AWS::ResourceGroups::Group
-    Properties:
-      Name: !Sub ApplicationInsights-SAM-${AWS::StackName}
-      ResourceQuery:
-        Type: CLOUDFORMATION_STACK_1_0
-
-  ApplicationInsightsMonitoring:
-    Type: AWS::ApplicationInsights::Application
-    Properties:
-      ResourceGroupName: !Ref ApplicationResourceGroup
-      AutoConfigurationEnabled: 'true'
-
 Outputs:
   SearchResultsApi:
     Description: API Gateway endpoint URL for Prod stage for Search Results function
