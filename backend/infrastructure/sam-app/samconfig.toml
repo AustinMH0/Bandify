@@ -14,6 +14,7 @@ lint = true
 
 [default.deploy.parameters]
 capabilities = "CAPABILITY_IAM"
+enable-application-insights = false
 confirm_changeset = false
 resolve_s3 = false
 s3_bucket = ""
