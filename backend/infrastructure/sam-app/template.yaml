@@ -61,7 +61,7 @@ Resources:
   SearchResultsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: db_results/
+      CodeUri: search_results/
       Handler: app.lambda_handler
       Runtime: python3.11
       Timeout: 30
