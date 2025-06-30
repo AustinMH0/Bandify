@@ -48,6 +48,7 @@ jobs:
         run: sam build --use-container
 
       - name: Deploy SAM app
+        continue-on-error: true
         env:
           DB_URL: ${{ secrets.DB_URL }}
           AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
