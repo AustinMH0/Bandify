@@ -2,7 +2,7 @@ import { Button } from "@mantine/core";
 
 const Login = () => {
   const handleLogin = () => {
-    window.location.href = "http://localhost:5000/"; 
+    window.location.href = "https://b1eq0t3rh0.execute-api.us-west-1.amazonaws.com/Prod";
   };
 
   return <Button onClick={handleLogin}>Login with Spotify</Button>;
