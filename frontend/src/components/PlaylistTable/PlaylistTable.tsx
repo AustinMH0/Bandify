@@ -56,6 +56,7 @@ const PlaylistTable = ({
   >({});
   
 
+
   const theme = useMantineTheme();
 
   const containerVariants = {
@@ -95,8 +96,11 @@ const PlaylistTable = ({
 
   useEffect(() => {
     const fetchPlaylists = async () => {
+
+      const API_BASE_URL = 'https://b1eq0t3rh0.execute-api.us-west-1.amazonaws.com/Prod';
+
       try {
-        const response = await axios.get("http://localhost:5000/get_playlists", {
+        const response = await axios.get(`${API_BASE_URL}/get_playlists`, {
           withCredentials: true,
         });
         const data = response.data;
@@ -116,13 +120,16 @@ const PlaylistTable = ({
   }, []);
 
   const fetchTracks = async (playlistId: string) => {
+
+    const API_BASE_URL = 'https://b1eq0t3rh0.execute-api.us-west-1.amazonaws.com/Prod';
+
     if (tracks[playlistId]) {
       setTrackTable(true);
       return;
     }
     setLoading(true);
     try {
-      const response = await axios.get(`http://localhost:5000/get_tracks/${playlistId}`, {
+      const response = await axios.get(`${API_BASE_URL}/get_tracks/${playlistId}`, {
         withCredentials: true,
       });
       const data: Track[] = response.data;
@@ -138,9 +145,12 @@ const PlaylistTable = ({
   const fetchSongPrices = async () => {
     if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
     setLoading(true);
+
+    const API_BASE_URL = 'https://b1eq0t3rh0.execute-api.us-west-1.amazonaws.com/Prod';
+
     try {
       const response = await axios.post(
-        "http://localhost:5000/db_results",
+        `${API_BASE_URL}/db_results`,
         {
           tracks: tracks[selectedPlaylist],
         },
