@@ -3,6 +3,9 @@ import { Container, Text } from "@mantine/core";
 import { IconChevronLeft, IconBrandSpotify } from "@tabler/icons-react";
 
 export default function HeroLoginCard({ onBack, classes }: any) {
+  const BASE_API_URL = import.meta.env.VITE_API_BASE_URL;
+
+
   return (
     <div>
       <button className={classes.backArrow} onClick={onBack} aria-label="Go back">
@@ -47,7 +50,7 @@ export default function HeroLoginCard({ onBack, classes }: any) {
           >
             <button
               className={`${classes.animatedButton} ${classes.greenMode}`}
-              onClick={() => (window.location.href = "https://b1eq0t3rh0.execute-api.us-west-1.amazonaws.com/Prod/get_playlists")}
+              onClick={() => (window.location.href = `f{BASE_API_URL}/get_playlists`)}
             >
               <IconBrandSpotify size={22} style={{ position: "relative", top: "1px" }} />
               Log in

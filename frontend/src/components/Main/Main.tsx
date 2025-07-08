@@ -16,10 +16,12 @@ export function Main() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [hideHero,] = useState(false);
 
+  const BASE_API_URL = import.meta.env.BASE_URL;
+
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await fetch("https://b1eq0t3rh0.execute-api.us-west-1.amazonaws.com/Prod/get_playlists", {
+        const response = await fetch(`f{BASE_API_URL}/get_playlists`, {
           credentials: "include",
         });
 
