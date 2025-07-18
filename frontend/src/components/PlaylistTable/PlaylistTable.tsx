@@ -97,10 +97,10 @@ const PlaylistTable = ({
   useEffect(() => {
     const fetchPlaylists = async () => {
 
-      const BASE_API_URL = import.meta.env.BASE_URL;
+      const baseURL= import.meta.env.VITE_API_BASE_URL;
 
       try {
-        const response = await axios.get(`${BASE_API_URL}/get_playlists`, {
+        const response = await axios.get(`${baseURL}/get_playlists`, {
           withCredentials: true,
         });
         const data = response.data;
@@ -121,7 +121,7 @@ const PlaylistTable = ({
 
   const fetchTracks = async (playlistId: string) => {
 
-    const BASE_API_URL = import.meta.env.BASE_URL;
+    const baseURL= import.meta.env.VITE_API_BASE_URL;
 
     if (tracks[playlistId]) {
       setTrackTable(true);
@@ -129,7 +129,7 @@ const PlaylistTable = ({
     }
     setLoading(true);
     try {
-      const response = await axios.get(`${BASE_API_URL}/get_tracks/${playlistId}`, {
+      const response = await axios.get(`${baseURL}/get_tracks/${playlistId}`, {
         withCredentials: true,
       });
       const data: Track[] = response.data;
@@ -146,11 +146,11 @@ const PlaylistTable = ({
     if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
     setLoading(true);
 
-    const BASE_API_URL = import.meta.env.BASE_URL;
+    const baseURL= import.meta.env.VITE_API_BASE_URL;
 
     try {
       const response = await axios.post(
-        `${BASE_API_URL}/db_results`,
+        `${baseURL}/db_results`,
         {
           tracks: tracks[selectedPlaylist],
         },
