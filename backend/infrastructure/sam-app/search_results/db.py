@@ -1,27 +1,40 @@
-from sqlalchemy.ext.automap import automap_base
-from sqlalchemy import MetaData, insert, tuple_
+from sqlalchemy import create_engine, MetaData, Table, and_
+from sqlalchemy.orm import Session
 
-md = MetaData()
-md.reflect(bind=None, only=['track']) 
-base = automap_base(metadata=md)
-base.prepare()
-Track = base.classes.track
+metadata = MetaData()
+track_table = None
 
-def get_existing_tracks(session, track_names, artists):
-    query = session.query(Track).filter(tuple_(Track.track_name, Track.artist).in_(zip(track_names, artists)))
-    results = query.all()
+def reflect_tables(engine):
+    global track_table
+    metadata.reflect(bind=engine, only=["track"])
+    track_table = metadata.tables["track"]
 
-    return {
-        (track.track_name, track.artist): {
-            'itunes_price': track.itunes_price,
-            'itunes_url': track.itunes_url,
-            'bandcamp_price': track.bandcamp_price,
-            'bandcamp_url': track.bandcamp_url,
-            'beatport_price': track.beatport_price,
-            'beatport_url': track.beatport_url
-        } for track in results
-    }
+def get_existing_tracks(session: Session, names=None, artists=None):
+    if not track_table:
+        raise Exception("track_table not initialized")
 
-def insert_tracks(session, tracks):
-    session.execute(insert(Track), tracks)
-    session.commit()
+    if names and artists:
+        conditions = [
+            and_(
+                track_table.c.track_name == name,
+                track_table.c.artist == artist
+            )
+            for name, artist in zip(names, artists)
+        ]
+        query = track_table.select().where(or_(*conditions))
+    else:
+        query = track_table.select()
+
+    result = session.execute(query)
+    rows = result.fetchall()
+
+    if names and artists:
+        return {
+            (row["track_name"], row["artist"]): dict(row._mapping)
+            for row in rows
+        }
+    else:
+        return [dict(row._mapping) for row in rows]
+
+def insert_tracks(session: Session, track_data):
+    session.execute(track_table.insert(), track_data)
