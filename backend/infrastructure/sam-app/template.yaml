@@ -61,7 +61,7 @@ Resources:
   SearchResultsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: db_results/
+      CodeUri: search_results/
       Handler: app.lambda_handler
       Runtime: python3.11
       Timeout: 30
@@ -78,19 +78,6 @@ Resources:
           DB_URL: !Ref DbUrl
       Tags:
         FunctionPurpose: SearchResults
-
-  ApplicationResourceGroup:
-    Type: AWS::ResourceGroups::Group
-    Properties:
-      Name: !Sub ApplicationInsights-SAM-${AWS::StackName}
-      ResourceQuery:
-        Type: CLOUDFORMATION_STACK_1_0
-
-  ApplicationInsightsMonitoring:
-    Type: AWS::ApplicationInsights::Application
-    Properties:
-      ResourceGroupName: !Ref ApplicationResourceGroup
-      AutoConfigurationEnabled: 'true'
 
 Outputs:
   SearchResultsApi:

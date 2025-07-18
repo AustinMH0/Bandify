@@ -1,8 +1,8 @@
 version = 0.1
 
 [default.global.parameters]
-stack_name = "sam-app"
-region = "us-west-1"
+stack_name = "groovonomy-infrastructure"
+region = ""
 
 [default.build.parameters]
 cached = true
@@ -15,9 +15,8 @@ lint = true
 [default.deploy.parameters]
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = false
-resolve_s3 = true
 s3_prefix = "sam-artifacts"
 parameter_overrides = [
-  "DbUrl=\"${DB_URL}\"",
-  "S3BucketName=\"${AWS_S3_BUCKET}\""
+  "DbUrl=placeholder-db-url",
+  "S3BucketName=placeholder-bucket-name"
 ]

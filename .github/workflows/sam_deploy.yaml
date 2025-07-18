@@ -1,0 +1,72 @@
+name: Build and Deploy SAM with Poetry
+
+on:
+  push:
+    branches:
+      - main
+
+defaults:
+  run:
+    working-directory: ./backend/infrastructure/sam-app
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.2
+      
+      - name: Export dependencies
+        run: poetry export -f requirements.txt --output requirements.txt --without-hashes
+        working-directory: backend/infrastructure/sam-app
+
+      - name: Set up AWS SAM
+        uses: aws-actions/setup-sam@v1
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubOIDCSAMDeployRole
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Build SAM app
+        run: sam build --use-container
+
+      - name: Deploy SAM app
+        continue-on-error: true
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          sam deploy \
+            --debug \
+            --stack-name aws-sam-cli-managed-default \
+            --region $AWS_REGION \
+            --capabilities CAPABILITY_IAM \
+            --s3-bucket $AWS_S3_BUCKET \
+            --s3-prefix sam-artifacts \
+            --parameter-overrides DbUrl=$DB_URL S3BucketName=$AWS_S3_BUCKET \
+            --no-confirm-changeset \
+
+      - name: Dump CloudFormation stack events
+        run: |
+          aws cloudformation describe-stack-events \
+            --stack-name aws-sam-cli-managed-default \
+            --region ${{ secrets.AWS_REGION }} \
+            --max-items 20

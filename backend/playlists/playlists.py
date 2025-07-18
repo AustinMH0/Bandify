@@ -14,12 +14,12 @@ load_dotenv()
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
 
 playlists_bp = Blueprint('playlists_bp', __name__)
-CORS(playlists_bp, supports_credentials=True)
+CORS(playlists_bp, origins=["https://groovonomy.com"], supports_credentials=True)
 
 # Spotify config
 client_id = os.getenv('CLIENT_ID')
 client_secret = os.getenv('CLIENT_SECRET')
-redirect_uri = 'http://localhost:5000/callback'
+redirect_uri = os.getenv('SPOTIFY_REDIRECT_URI', 'http://localhost:5000/callback')
 scope = 'playlist-read-private playlist-read-collaborative'
 
 # Auth handler
@@ -47,15 +47,20 @@ def home():
 
 @playlists_bp.route('/callback')
 def callback():
-    sp_oauth.get_access_token(request.args['code'])
+    code = request.args.get('code')
+    if code:
+        sp_oauth.get_access_token(code)
+
+    # Redirect back to frontend
     return redirect(FRONTEND_URL)
 
 
 @playlists_bp.route('/get_playlists')
 def get_playlists():
-    if not sp_oauth.validate_token(cache_handler.get_cached_token()):
-        auth_url = sp_oauth.get_authorize_url()
-        return redirect(auth_url)
+    token_info = cache_handler.get_cached_token()
+    if not token_info or not sp_oauth.validate_token(token_info):
+        # Now returns 401 JSON instead of redirect
+        return jsonify({'error': 'Unauthorized'}), 401
 
     playlists = sp.current_user_playlists()
     user_info = sp.me()
@@ -67,12 +72,17 @@ def get_playlists():
             'id': playlist['id'],
             'name': playlist['name'],
             'total_tracks': playlist['tracks']['total'],
-            'image': playlist['images'][0]['url'] if playlist['images'] else None
+            'image': playlist['images'][0]['url'] if playlist['images'] else None,
+            'owner': {
+                'id': playlist['owner']['id'],
+                'display_name': playlist['owner']['display_name']
+            }
         }
-        for playlist in playlists['items'] if playlist['owner']['id'] == user_id
+        for playlist in playlists['items']
     ]
 
     return jsonify({
+        'id': user_id,
         'display_name': user_info['display_name'],
         'profile_picture': profile_pic,
         'playlists': result
@@ -103,6 +113,12 @@ def get_tracks(playlist_id):
 
     return jsonify(tracks)
 
+
+
+@playlists_bp.route('/login')
+def login():
+    auth_url = sp_oauth.get_authorize_url()
+    return redirect(auth_url)
 
 @playlists_bp.route('/logout')
 def logout():

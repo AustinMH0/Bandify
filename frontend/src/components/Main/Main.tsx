@@ -5,7 +5,7 @@ import { Container } from "@mantine/core";
 import { SpheresBackground } from "../Spheres/SpheresBackground";
 import classes from "./Main.module.css";
 import PlaylistTable from "../PlaylistTable/PlaylistTable";
-import HeroBox from "../HeroBox/HeroBox"; 
+import HeroBox from "../HeroBox/HeroBox";
 import Header from "../Header/Header";
 
 import type { Playlist } from "../../types/types";
@@ -14,12 +14,14 @@ export function Main() {
   const [showLoginCard, setShowLoginCard] = useState(false);
   const [user, setUser] = useState<{ display_name: string; profile_picture: string | null } | null>(null);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [hideHero, ] = useState(false); 
+  const [hideHero,] = useState(false);
+
+  const BASE_API_URL = import.meta.env.BASE_URL;
 
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await fetch("http://localhost:5000/get_playlists", {
+        const response = await fetch(`f{BASE_API_URL}/get_playlists`, {
           credentials: "include",
         });
 
@@ -40,7 +42,7 @@ export function Main() {
   }, []);
 
   const loggedIn = user !== null;
-  
+
   return (
     <div>
       <Header user={user} showLoginCard={showLoginCard} setShowLoginCard={setShowLoginCard} />

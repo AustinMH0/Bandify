@@ -1,0 +1,15 @@
+name: Deploy Frontend and Backend
+
+on:
+  workflow_dispatch:  # Manually triggered from GitHub Actions UI
+  push:
+    branches:
+      - main 
+
+jobs:
+  deploy-frontend:
+    uses: ./.github/workflows/frontend_deploy.yaml
+
+  deploy-backend:
+    needs: deploy-frontend
+    uses: ./.github/workflows/sam_deploy.yaml

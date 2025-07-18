@@ -6,6 +6,8 @@ import {
   useInView,
   useAnimation,
   AnimatePresence,
+  useMotionValue,
+  useSpring,
 } from "framer-motion";
 
 import HeroWelcome from "./HeroWelcome";
@@ -45,13 +47,18 @@ const HeroBox = ({
   const fadeTimeoutRef = useRef<number | null>(null);
   const clearTimeoutRef = useRef<number | null>(null);
 
+  const rotateX = useMotionValue(0);
+  const rotateY = useMotionValue(0);
+
+  const smoothRotateX = useSpring(rotateX, { stiffness: 120, damping: 12 });
+  const smoothRotateY = useSpring(rotateY, { stiffness: 120, damping: 12 });
+
   useEffect(() => {
     if (isInView) {
       bounceControls.start({
         scale: [0.95, 1.05],
         transition: { type: "spring", stiffness: 600, damping: 10 },
       });
-  
     }
   }, [isInView, bounceControls]);
 
@@ -65,34 +72,22 @@ const HeroBox = ({
     const deltaX = (offsetX - centerX) / centerX;
     const deltaY = (offsetY - centerY) / centerY;
 
-    const deadZone = 0.2;
-    const tiltStrength = 2;
+    const tiltStrength = 10;
+    rotateX.set(-deltaY * tiltStrength);
+    rotateY.set(deltaX * tiltStrength);
 
-    const isOutsideDeadZone = Math.abs(deltaX) > deadZone || Math.abs(deltaY) > deadZone;
+    if (!fastGradient) {
+      setFastGradient(true);
+      setFadeOut(false);
 
-    if (isOutsideDeadZone) {
-      const rotateX = -deltaY * tiltStrength;
-      const rotateY = deltaX * tiltStrength;
-
-      e.currentTarget.style.transition = "transform 0.2s ease-out";
-      e.currentTarget.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-
-      if (!fastGradient) {
-        setFastGradient(true);
-        setFadeOut(false);
-
-        fadeTimeoutRef.current = window.setTimeout(() => setFadeOut(true), 500);
-        clearTimeoutRef.current = window.setTimeout(() => setFastGradient(false), 1000);
-      }
-    } else {
-      // Inside dead zone — no rotation
-      e.currentTarget.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg)";
+      fadeTimeoutRef.current = window.setTimeout(() => setFadeOut(true), 500);
+      clearTimeoutRef.current = window.setTimeout(() => setFastGradient(false), 1000);
     }
   };
 
-  const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-    e.currentTarget.style.transition = "transform 0.2s ease";
-    e.currentTarget.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg)";
+  const handleMouseLeave = () => {
+    rotateX.set(0);
+    rotateY.set(0);
   };
 
   useEffect(() => {
@@ -110,10 +105,12 @@ const HeroBox = ({
           style={{
             opacity,
             scale,
+            rotateX: smoothRotateX,
+            rotateY: smoothRotateY,
+            transformPerspective: 1000,
             transformStyle: "preserve-3d",
-            backfaceVisibility: "hidden", // <-- this helps during rotation
-            willChange: "transform",      // <-- hint to browser to prepare GPU resources
-            position: "relative"
+            willChange: "transform",
+            position: "relative",
           }}
           className={`
             ${classes.heroBox}
@@ -136,7 +133,7 @@ const HeroBox = ({
             )}
           </AnimatePresence>
 
-          <motion.div animate={bounceControls}>
+          <motion.div animate={bounceControls} className={classes.heroBoxContent}>
             {!loggedIn ? (
               showLoginCard ? (
                 <HeroLoginCard onBack={() => setShowLoginCard(false)} classes={classes} />
