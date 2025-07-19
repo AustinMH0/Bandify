@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Inject environment variables for Vite
+        run: echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" >> .env
+
       - name: Build app
         run: npm run build
 
@@ -41,7 +44,7 @@ jobs:
 
       - name: Upload to S3 using AWS CLI
         run: |
-          aws s3 sync dist/ s3://${{ secrets.AWS_S3_BUCKET }}
+          aws s3 sync dist/ s3://${{ secrets.AWS_S3_BUCKET }} --delete
 
       - name: Invalidate CloudFront cache
         run: |
