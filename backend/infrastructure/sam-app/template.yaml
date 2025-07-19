@@ -73,6 +73,11 @@ Resources:
           Properties:
             Path: /db_results
             Method: post
+        GetPlaylistsEndpoint:
+          Type: Api
+          Properties:
+            Path: /get_playlists
+            Method: get
       Environment:
         Variables:
           DB_URL: !Ref DbUrl
