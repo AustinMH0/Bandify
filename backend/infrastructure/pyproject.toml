@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "search-results"
+version = "0.1.0"
+description = ""
+authors = ["AustinMH0 <austinmhendricks@gmail.com>"]
+
+packages = [
+  { include = "search_results" },
+  { include = "search" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = ">=2.32.3,<3.0.0"
+sqlalchemy = ">=2.0.41,<3.0.0"
+beautifulsoup4 = ">=4.13.4,<5.0.0"
+playwright = ">=1.52.0,<2.0.0"
+fake-useragent = "^2.2.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

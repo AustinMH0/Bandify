@@ -1,0 +1,23 @@
+version = 0.1
+
+[default.global.parameters]
+stack_name = "groovonomy-infrastructure"
+region = "us-west-1"
+
+[default.build.parameters]
+cached = true
+parallel = true
+use_container = true
+
+[default.validate.parameters]
+lint = true
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+s3_prefix = "groovonomy-infrastructure"
+parameter_overrides = "DbUrl=\"bandify-db-lite.cbege6eyij83.us-west-1.rds.amazonaws.com\" S3BucketName=\"groovonomy-frontend-bucket\""
+resolve_s3 = true
+profile = "AdministratorAccess-324938817450"
+disable_rollback = true
+image_repositories = []
