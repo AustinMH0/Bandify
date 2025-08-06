@@ -57,6 +57,17 @@ Resources:
                 Resource:
                   - !Sub arn:aws:s3:::${S3BucketName}
                   - !Sub arn:aws:s3:::${S3BucketName}/*
+           
+  GroovonomyCommonDeps:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: GroovoonomyCommonDeps
+      Description: Common dependencies for Groovonomy SearchResultsFunction
+      Content:
+        S3Bucket: groovonomy-frontend-bucket
+        S3Key: lambda_layer.zip
+      CompatibleRuntimes:
+        - python3.11
 
   SearchResultsFunction:
     Type: AWS::Serverless::Function
@@ -83,6 +94,8 @@ Resources:
           DB_URL: !Ref DbUrl
       Tags:
         FunctionPurpose: SearchResults
+      Layers:
+        - !Ref GroovonomyCommonDeps
 
 Outputs:
   SearchResultsApi:

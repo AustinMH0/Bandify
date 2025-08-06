@@ -114,6 +114,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Lambda Layer
+lambda_layer/
+lambda_layer.zip
+
 # C extensions
 *.so
 
