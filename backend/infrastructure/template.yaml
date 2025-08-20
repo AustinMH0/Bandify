@@ -57,17 +57,6 @@ Resources:
                 Resource:
                   - !Sub arn:aws:s3:::${S3BucketName}
                   - !Sub arn:aws:s3:::${S3BucketName}/*
-           
-  GroovonomyCommonDeps:
-    Type: AWS::Lambda::LayerVersion
-    Properties:
-      LayerName: GroovoonomyCommonDeps
-      Description: Common dependencies for Groovonomy SearchResultsFunction
-      Content:
-        S3Bucket: groovonomy-frontend-bucket
-        S3Key: lambda_layer.zip
-      CompatibleRuntimes:
-        - python3.11
 
   SearchResultsFunction:
     Type: AWS::Serverless::Function
@@ -92,11 +81,57 @@ Resources:
       Environment:
         Variables:
           DB_URL: !Ref DbUrl
+          PLAYWRIGHT_API_URL: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/playwright_function"
       Tags:
         FunctionPurpose: SearchResults
-      Layers:
-        - !Ref GroovonomyCommonDeps
+  
+  PlaywrightExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaBasicExecution
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:log-group:/aws/lambda/*
+              - Effect: Allow
+                Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:ListBucket
+                Resource:
+                - !Sub arn:aws:s3:::${S3BucketName}
+                - !Sub arn:aws:s3:::${S3BucketName}/*
 
+  PlaywrightFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: playwright_function/
+      Handler: app.lambda_handler
+      Runtime: python3.11
+      Timeout: 30
+      MemorySize: 1024
+      Role: !GetAtt PlaywrightExecutionRole.Arn
+      Events:
+        apiPlaywright:
+          Type: Api
+          Properties:
+            Path: /playwright_function
+            Method: post
+
+           
 Outputs:
   SearchResultsApi:
     Description: API Gateway endpoint URL for Prod stage for Search Results function
@@ -109,3 +144,17 @@ Outputs:
   SearchResultsFunctionIamRole:
     Description: Custom IAM Role used by Search Results function
     Value: !GetAtt SearchResultsExecutionRole.Arn
+
+
+  PlaywrightApi:
+    Description: API Gateway endpoint URL for Prod stage for Playwright function
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/playwright_function/"
+
+  PlaywrightFunction:
+      Description: Playwright Lambda Function ARN
+      Value: !GetAtt PlaywrightFunction.Arn
+
+
+  PlaywrightFunctionIamRole:
+    Description: Custom IAM Role used by Playwright function
+    Value: !GetAtt PlaywrightExecutionRole.Arn

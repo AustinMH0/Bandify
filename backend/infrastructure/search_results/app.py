@@ -63,11 +63,16 @@ def lambda_handler(event, context):
                 song_data = db_dict.get(key)
                 if not song_data:
                     song_data = get_api_prices(track['artist'], track['name'])
-                    new_data.append(song_data)
 
-                song_data['track_name'] = track['name']
-                song_data['artist'] = track['artist']
+                    song_data['track_name'] = track['name']
+                    song_data['artist'] = track['artist']
+                    new_data.append(song_data)
+                else:
+                    song_data['track_name'] = track['name']
+                    song_data['artist'] = track['artist']
+                
                 final_data.append(song_data)
+
 
             if new_data:
                 insert_tracks(session, new_data)

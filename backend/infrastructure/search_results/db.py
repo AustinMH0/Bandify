@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, MetaData, Table, and_
+from sqlalchemy import create_engine, MetaData, Table, and_, or_
 from sqlalchemy.orm import Session
 
 metadata = MetaData()
