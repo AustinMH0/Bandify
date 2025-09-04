@@ -16,7 +16,7 @@ export function Main() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [hideHero,] = useState(false);
 
-  const baseURL= import.meta.env.VITE_API_BASE_URL;
+  const baseURL = import.meta.env.VITE_SEARCHRESULTS_API;
 
   useEffect(() => {
     const fetchUser = async () => {
