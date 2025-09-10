@@ -47,7 +47,35 @@ jobs:
       - name: Build SAM app
         run: sam build --use-container
 
-      - name: Deploy SAM app
+      # Playwright stack deploy
+
+      - name: Deploy Playwright Stack
+        continue-on-error: true
+        env:
+          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          sam deploy \
+            --debug \
+            --template-file template-playwright.yaml \
+            --stack-name PlaywrightStack \
+            --region $AWS_REGION \
+            --capabilities CAPABILITY_IAM \
+            --s3-bucket $AWS_S3_BUCKET \
+            --s3-prefix sam-artifacts/playwright \
+            --parameter-overrides S3BucketName=$AWS_S3_BUCKET \
+            --no-confirm-changeset
+
+      - name: Dump Playwright stack events
+        run: |
+          aws cloudformation describe-stack-events \
+            --stack-name PlaywrightStack \
+            --region ${{ secrets.AWS_REGION }} \
+            --max-items 20
+
+      # SearchResults stack deploy
+
+      - name: Deploy SearchResults Stack
         continue-on-error: true
         env:
           DB_URL: ${{ secrets.DB_URL }}
@@ -56,17 +84,18 @@ jobs:
         run: |
           sam deploy \
             --debug \
-            --stack-name aws-sam-cli-managed-default \
+            --template-file template-searchresults.yaml \
+            --stack-name SearchResultsStack \
             --region $AWS_REGION \
             --capabilities CAPABILITY_IAM \
             --s3-bucket $AWS_S3_BUCKET \
-            --s3-prefix sam-artifacts \
+            --s3-prefix sam-artifacts/searchresults \
             --parameter-overrides DbUrl=$DB_URL S3BucketName=$AWS_S3_BUCKET \
-            --no-confirm-changeset \
+            --no-confirm-changeset
 
-      - name: Dump CloudFormation stack events
+      - name: Dump SearchResults Stack Events
         run: |
           aws cloudformation describe-stack-events \
-            --stack-name aws-sam-cli-managed-default \
+            --stack-name SearchResultsStack \
             --region ${{ secrets.AWS_REGION }} \
             --max-items 20

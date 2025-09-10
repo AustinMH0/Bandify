@@ -1,10 +1,10 @@
 import { Button } from "@mantine/core";
 
 const Login = () => {
-  const baseURL= import.meta.env.VITE_API_BASE_URL;
+  const baseURL = import.meta.env.VITE_SEARCHRESULTS_API;
 
   const handleLogin = () => {
-    window.location.href = `${baseURL}`;
+    window.location.href = `${baseURL}/get_playlists`;
   };
 
   return <Button onClick={handleLogin}>Login with Spotify</Button>;

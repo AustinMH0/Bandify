@@ -97,7 +97,7 @@ const PlaylistTable = ({
   useEffect(() => {
     const fetchPlaylists = async () => {
 
-      const baseURL= import.meta.env.VITE_API_BASE_URL;
+      const baseURL = import.meta.env.VITE_SEARCHRESULTS_API;
 
       try {
         const response = await axios.get(`${baseURL}/get_playlists`, {
@@ -121,7 +121,7 @@ const PlaylistTable = ({
 
   const fetchTracks = async (playlistId: string) => {
 
-    const baseURL= import.meta.env.VITE_API_BASE_URL;
+    const baseURL = import.meta.env.VITE_SEARCHRESULTS_API;
 
     if (tracks[playlistId]) {
       setTrackTable(true);
@@ -146,7 +146,7 @@ const PlaylistTable = ({
     if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
     setLoading(true);
 
-    const baseURL= import.meta.env.VITE_API_BASE_URL;
+    const baseURL = import.meta.env.VITE_SEARCHRESULTS_API;
 
     try {
       const response = await axios.post(

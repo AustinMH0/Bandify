@@ -40,6 +40,11 @@ jobs:
           role-to-assume: ${{ env.ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Inject environment variables for Vite
+        run: |
+          echo "VITE_SEARCHRESULTS_API=${{ secrets.VITE_SEARCHRESULTS_API }}" >> .env
+          echo "VITE_PLAYWRIGHT_API=${{ secrets.VITE_PLAYWRIGHT_API }}" >> .env
+
       - name: npm ci, build and test
         run: |
           npm ci
