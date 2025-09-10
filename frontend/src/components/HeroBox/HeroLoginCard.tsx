@@ -3,7 +3,7 @@ import { Container, Text } from "@mantine/core";
 import { IconChevronLeft, IconBrandSpotify } from "@tabler/icons-react";
 
 export default function HeroLoginCard({ onBack, classes }: any) {
-  const baseURL= import.meta.env.VITE_API_BASE_URL;
+  const baseURL = import.meta.env.VITE_SEARCHRESULTS_API;
 
 
   return (

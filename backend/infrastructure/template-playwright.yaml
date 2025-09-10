@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Playwright API Stack
+
+Parameters:
+  S3BucketName:
+    Type: String
+    Description: Name of the S3 bucket this Lambda function will access
+
+Globals:
+  Function:
+    Timeout: 3
+    Tracing: Active
+    LoggingConfig:
+      LogFormat: JSON
+    Tags:
+      Project: Groovonomy
+      Environment: Production
+
+Resources:
+  MyApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+
+  PlaywrightExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaBasicExecution
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:log-group:/aws/lambda/*
+              - Effect: Allow
+                Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:ListBucket
+                Resource:
+                - !Sub arn:aws:s3:::${S3BucketName}
+                - !Sub arn:aws:s3:::${S3BucketName}/*
+
+  PlaywrightFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: playwright_function/
+      Handler: app.lambda_handler
+      Runtime: python3.11
+      Timeout: 30
+      MemorySize: 1024
+      Role: !GetAtt PlaywrightExecutionRole.Arn
+      Events:
+        apiPlaywright:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MyApi
+            Path: /playwright_function
+            Method: post
+
+Outputs:
+  PlaywrightApiUrl:
+    Description: API Gateway endpoint URL for Playwright function
+    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/playwright_function/"
+    Export:
+      Name: PlaywrightApiUrlExport
