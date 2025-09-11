@@ -31,12 +31,26 @@ jobs:
         with:
           version: 1.8.2
       
-      - name: Export dependencies
-        run: poetry export -f requirements.txt --output requirements.txt --without-hashes
-        working-directory: backend/infrastructure/sam-app
+      # Export dependencies for Playwright Lambda Function
+
+      - name: Export Playwright dependencies
+        run: |
+          poetry export -f requirements.txt --without-hashes --with-group playwright -o playwright_function/requirements.txt
+        working-directory: backend/infrastructure
+
+      # Export dependencies for SearchResults Lambda Function
+
+      - name: Export SearchResults dependencies
+        run: |
+          poetry export -f requirements.txt --without-hashes -o search_results/requirements.txt
+        working-directory: backend/infrastructure
+
+      # Set up AWS SAM CLI
 
       - name: Set up AWS SAM
         uses: aws-actions/setup-sam@v1
+
+      # Configure AWS Credentials
 
       - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v2
@@ -44,21 +58,25 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubOIDCSAMDeployRole
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Build SAM app
-        run: sam build --use-container
+      # Build SAM apps
+      
+      - name: Build Playwright stack
+        run: sam build --template-file playwright/template-playwright.yaml --use-container
+
+      - name: Build SearchResults stack
+        run: sam build --template-file search_results/template-searchresults.yaml --use-container
+
 
       # Playwright stack deploy
 
       - name: Deploy Playwright Stack
-        continue-on-error: true
         env:
           AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           sam deploy \
-            --debug \
-            --template-file template-playwright.yaml \
-            --stack-name PlaywrightStack \
+            --template-file playwright/template-playwright.yaml \
+            --stack-name playwright-stack \
             --region $AWS_REGION \
             --capabilities CAPABILITY_IAM \
             --s3-bucket $AWS_S3_BUCKET \
@@ -76,16 +94,14 @@ jobs:
       # SearchResults stack deploy
 
       - name: Deploy SearchResults Stack
-        continue-on-error: true
         env:
           DB_URL: ${{ secrets.DB_URL }}
           AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           sam deploy \
-            --debug \
-            --template-file template-searchresults.yaml \
-            --stack-name SearchResultsStack \
+            --template-file search_results/template-searchresults.yaml \
+            --stack-name searchresults-stack \
             --region $AWS_REGION \
             --capabilities CAPABILITY_IAM \
             --s3-bucket $AWS_S3_BUCKET \
