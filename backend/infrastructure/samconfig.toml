@@ -15,10 +15,10 @@ lint = true
 [default.deploy.parameters]
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
-s3_prefix = "searchresults-stack"
-parameter_overrides = "DbUrl=\"bandify-db-lite.cbege6eyij83.us-west-1.rds.amazonaws.com\" S3BucketName=\"groovonomy-frontend-bucket\""
+s3_prefix = "playwright-stack"
+parameter_overrides = "S3BucketName=\"groovonomy-frontend-bucket\""
 resolve_s3 = true
 profile = "AdministratorAccess-324938817450"
 disable_rollback = true
 image_repositories = []
-stack_name = "searchresults-stack"
+stack_name = "playwright-stack"

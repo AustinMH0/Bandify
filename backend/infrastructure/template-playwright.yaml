@@ -69,10 +69,10 @@ Resources:
             RestApiId: !Ref MyApi
             Path: /playwright_function
             Method: post
-      Metadata:
-        BuildMethod: python3.11
-        BuildProperties:
-          Requirements: playwright_function/requirements.txt
+    Metadata:
+      BuildMethod: python3.11
+      BuildProperties:
+        Requirements: playwright_function/requirements.txt
 
 Outputs:
   PlaywrightApiUrl:
