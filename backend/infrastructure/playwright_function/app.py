@@ -1,5 +1,5 @@
 import json
-from playwright_function.search import BandcampSearch, BeatportSearch
+from search import BandcampSearch, BeatportSearch
 
 def lambda_handler(event, context):
     

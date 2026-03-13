@@ -76,12 +76,12 @@ Resources:
         Variables:
           DB_URL: !Ref DbUrl
           PLAYWRIGHT_API_URL: !ImportValue PlaywrightApiUrlExport
-      Metadata:
-        BuildMethod: python3.11
-        BuildProperties:
-          Requirements: search_results/requirements.txt
       Tags:
         FunctionPurpose: SearchResults
+    Metadata:
+      BuildMethod: python3.11
+      BuildProperties:
+        Requirements: search_results/requirements.txt
 
 Outputs:
   SearchResultsFunction:

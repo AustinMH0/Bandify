@@ -7,7 +7,7 @@ on:
 
 defaults:
   run:
-    working-directory: ./backend/infrastructure/sam-app
+    working-directory: ./backend/infrastructure/.aws-sam
 
 permissions:
   id-token: write
