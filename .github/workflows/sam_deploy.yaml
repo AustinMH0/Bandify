@@ -43,7 +43,7 @@ jobs:
       - name: Export SearchResults dependencies
         run: |
           poetry export -f requirements.txt --without-hashes -o search_results/requirements.txt
-        working-directory: backend/infrastructure
+        working-directory: backend/infrastructure/search_results
 
       # Set up AWS SAM CLI
 
@@ -61,10 +61,10 @@ jobs:
       # Build SAM apps
       
       - name: Build Playwright stack
-        run: sam build --template-file playwright/template-playwright.yaml --use-container
+        run: sam build --template-file ./backend/infrastructure/template-playwright.yaml --use-container
 
       - name: Build SearchResults stack
-        run: sam build --template-file search_results/template-searchresults.yaml --use-container
+        run: sam build --template-file ./backend/infrastructure/template-searchresults.yaml --use-container
 
 
       # Playwright stack deploy
