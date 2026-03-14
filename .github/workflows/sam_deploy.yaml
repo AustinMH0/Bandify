@@ -43,7 +43,7 @@ jobs:
       - name: Export SearchResults dependencies
         run: |
           poetry export -f requirements.txt --without-hashes -o search_results/requirements.txt
-        working-directory: backend/infrastructure/search_results
+        working-directory: backend/infrastructure
 
       # Set up AWS SAM CLI
 
