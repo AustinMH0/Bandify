@@ -35,7 +35,7 @@ jobs:
 
       - name: Export Playwright dependencies
         run: |
-          poetry export -f requirements.txt --without-hashes --with-group playwright -o playwright_function/requirements.txt
+          poetry export -f requirements.txt --without-hashes --with playwright -o playwright_function/requirements.txt
         working-directory: backend/infrastructure
 
       # Export dependencies for SearchResults Lambda Function
