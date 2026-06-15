@@ -7,7 +7,7 @@ on:
 
 defaults:
   run:
-    working-directory: 
+    working-directory: backend/infrastructure
 
 permissions:
   id-token: write
@@ -61,10 +61,10 @@ jobs:
       # Build SAM apps
       
       - name: Build Playwright stack
-        run: sam build --template-file ./backend/infrastructure/template-playwright.yaml --use-container
+        run: sam build --template-file backend/infrastructure/template-playwright.yaml --use-container
 
       - name: Build SearchResults stack
-        run: sam build --template-file ./backend/infrastructure/template-searchresults.yaml --use-container
+        run: sam build --template-file backend/infrastructure/template-searchresults.yaml --use-container
 
 
       # Playwright stack deploy
