@@ -61,10 +61,10 @@ jobs:
       # Build SAM apps
       
       - name: Build Playwright stack
-        run: sam build --template-file template-playwright.yaml --use-container
+        run: sam build --template-file ./backend/infrastructure/template-playwright.yaml --use-container
 
       - name: Build SearchResults stack
-        run: sam build --template-file template-searchresults.yaml --use-container
+        run: sam build --template-file ./backend/infrastructure/template-searchresults.yaml --use-container
 
 
       # Playwright stack deploy
@@ -75,7 +75,7 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           sam deploy \
-            --template-file playwright/template-playwright.yaml \
+            --template-file playwright_function/template-playwright.yaml \
             --stack-name playwright-stack \
             --region $AWS_REGION \
             --capabilities CAPABILITY_IAM \
