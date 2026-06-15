@@ -7,7 +7,7 @@ on:
 
 defaults:
   run:
-    working-directory: backend/infrastructure
+    working-directory: 
 
 permissions:
   id-token: write
