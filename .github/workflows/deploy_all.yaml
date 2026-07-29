@@ -6,10 +6,17 @@ on:
     branches:
       - main 
 
+permissions:
+  id-token: write
+  contents: read
+
+
 jobs:
   deploy-frontend:
     uses: ./.github/workflows/frontend_deploy.yaml
+    secrets: inherit
 
   deploy-backend:
     needs: deploy-frontend
     uses: ./.github/workflows/sam_deploy.yaml
+    secrets: inherit

@@ -1,9 +1,7 @@
 name: Build and Deploy SAM with Poetry
 
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
 
 defaults:
   run:
@@ -64,7 +62,7 @@ jobs:
         run: sam build --template-file template-playwright.yaml --build-dir .aws-sam/playwright --use-container
 
       - name: Build SearchResults stack
-        run: sam build --template-file template-search_results.yaml --build-dir .aws/search_results --
+        run: sam build --template-file template-searchresults.yaml --build-dir .aws-sam/search_results --use-container
 
 
       # Playwright stack deploy

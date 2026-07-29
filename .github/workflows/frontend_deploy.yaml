@@ -1,11 +1,8 @@
 name: Upload Website
 
 on:
-  push:
-    branches: [ 'main' ]
-  pull_request:
-    branches: [ 'main' ]
-
+  workflow_call:
+  
 defaults:
   run:
     working-directory: ./frontend
