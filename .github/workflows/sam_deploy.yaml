@@ -61,10 +61,10 @@ jobs:
       # Build SAM apps
       
       - name: Build Playwright stack
-        run: sam build --template-file backend/infrastructure/template-playwright.yaml --use-container
+        run: sam build --template-file template-playwright.yaml --build-dir .aws-sam/playwright --use-container
 
       - name: Build SearchResults stack
-        run: sam build --template-file backend/infrastructure/template-searchresults.yaml --use-container
+        run: sam build --template-file template-search_results.yaml --build-dir .aws/search_results --
 
 
       # Playwright stack deploy
@@ -75,7 +75,7 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           sam deploy \
-            --template-file template-playwright.yaml \
+            --template-file .aws-sam/playwright/template.yaml \
             --stack-name playwright-stack \
             --region $AWS_REGION \
             --capabilities CAPABILITY_IAM \
@@ -87,7 +87,7 @@ jobs:
       - name: Dump Playwright stack events
         run: |
           aws cloudformation describe-stack-events \
-            --stack-name PlaywrightStack \
+            --stack-name playwright-stack \
             --region ${{ secrets.AWS_REGION }} \
             --max-items 20
 
@@ -100,7 +100,7 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           sam deploy \
-            --template-file template-searchresults.yaml \
+            --template-file .aws-sam/search_results/template.yaml \
             --stack-name searchresults-stack \
             --region $AWS_REGION \
             --capabilities CAPABILITY_IAM \
@@ -112,6 +112,6 @@ jobs:
       - name: Dump SearchResults Stack Events
         run: |
           aws cloudformation describe-stack-events \
-            --stack-name SearchResultsStack \
+            --stack-name searchresults-stack \
             --region ${{ secrets.AWS_REGION }} \
             --max-items 20
