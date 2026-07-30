@@ -107,6 +107,11 @@ jobs:
             --parameter-overrides DbUrl=$DB_URL S3BucketName=$AWS_S3_BUCKET \
             --no-confirm-changeset
 
+      - name: Verify SearchResults build artifacts
+        run: |
+          test -f .aws-sam/search_results/SearchResultsFunction/idna/__init__.python
+          test -d .aws-sam/search_results/SearchResultsFunction/sqlalchemy
+
       - name: Dump SearchResults Stack Events
         run: |
           aws cloudformation describe-stack-events \
