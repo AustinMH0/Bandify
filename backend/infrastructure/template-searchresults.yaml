@@ -11,6 +11,28 @@ Parameters:
     Type: String
     Description: Name of the S3 bucket this Lambda function will access
 
+  SpotifyClientId:
+    Type: String
+    MinLength: 1
+    Description: Client ID of the Spotify app used for sign-in
+
+  SpotifyClientSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 1
+    Description: Client secret of the Spotify app used for sign-in
+
+  SessionSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: Fixed random key that encrypts sign-in sessions; must stay the same across deploys
+
+  FrontendUrl:
+    Type: String
+    Default: https://groovonomy.com
+    Description: Origin of the front end; users return here after signing in
+
 Globals:
   Function:
     Timeout: 3
@@ -58,29 +80,33 @@ Resources:
       CodeUri: search_results/
       Handler: app.lambda_handler
       Runtime: python3.11
-      Timeout: 30
+      # Stays under API Gateway's 29 second integration limit
+      Timeout: 28
       MemorySize: 512
       Role: !GetAtt SearchResultsExecutionRole.Arn
       Events:
-        DbResultsEndpoint:
+        # /login, /callback, /get_playlists, /get_tracks/{id}, /db_results and CORS preflight
+        ApiEndpoint:
           Type: Api
           Properties:
-            Path: /db_results
-            Method: post
-        GetPlaylistsEndpoint:
-          Type: Api
-          Properties:
-            Path: /get_playlists
-            Method: get
+            Path: /{proxy+}
+            Method: any
       Environment:
         Variables:
           DB_URL: !Ref DbUrl
           PLAYWRIGHT_API_URL: !ImportValue PlaywrightApiUrlExport
+          CLIENT_ID: !Ref SpotifyClientId
+          CLIENT_SECRET: !Ref SpotifyClientSecret
+          SESSION_SECRET: !Ref SessionSecret
+          FRONTEND_URL: !Ref FrontendUrl
       Tags:
         FunctionPurpose: SearchResults
    
 
 Outputs:
+  SpotifyRedirectUri:
+    Description: Redirect URI to register in the Spotify developer dashboard
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/callback"
   SearchResultsFunction:
     Description: Search Results Lambda Function ARN
     Value: !GetAtt SearchResultsFunction.Arn

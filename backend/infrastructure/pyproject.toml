@@ -20,7 +20,8 @@ fake-useragent = "2.2.0"
 idna = "3.10"
 psycopg2-binary = "2.9.10"
 requests = "2.32.3"
-sqlalchemy = "2.0.31" 
+sqlalchemy = "2.0.31"
+cryptography = "45.0.5"
 
 # Playwright-specific dependencies
 [tool.poetry.group.playwright.dependencies]

@@ -94,6 +94,9 @@ jobs:
       - name: Deploy SearchResults Stack
         env:
           DB_URL: ${{ secrets.DB_URL }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
@@ -105,11 +108,13 @@ jobs:
             --s3-bucket $AWS_S3_BUCKET \
             --s3-prefix sam-artifacts/searchresults \
             --parameter-overrides DbUrl=$DB_URL S3BucketName=$AWS_S3_BUCKET \
+              SpotifyClientId=$SPOTIFY_CLIENT_ID SpotifyClientSecret=$SPOTIFY_CLIENT_SECRET \
+              SessionSecret=$SESSION_SECRET \
             --no-confirm-changeset
 
       - name: Verify SearchResults build artifacts
         run: |
-          test -f .aws-sam/search_results/SearchResultsFunction/idna/__init__.python
+          test -f .aws-sam/search_results/SearchResultsFunction/idna/__init__.py
           test -d .aws-sam/search_results/SearchResultsFunction/sqlalchemy
 
       - name: Dump SearchResults Stack Events

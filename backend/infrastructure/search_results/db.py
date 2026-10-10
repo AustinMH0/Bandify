@@ -1,8 +1,25 @@
-from sqlalchemy import create_engine, MetaData, Table, and_, or_
+import os
+
+from sqlalchemy import create_engine, MetaData, and_, or_
 from sqlalchemy.orm import Session
+
+# Seconds to wait for the Postgres TCP connect before giving up
+DB_CONNECT_TIMEOUT = 5
 
 metadata = MetaData()
 track_table = None
+_engine = None
+
+def get_engine():
+    # Created on first use so a cold start never waits on the database
+    global _engine
+    if _engine is None:
+        url = os.environ['DB_URL']
+        connect_args = {"connect_timeout": DB_CONNECT_TIMEOUT} if url.startswith("postgres") else {}
+        _engine = create_engine(url, connect_args=connect_args)
+    if track_table is None:
+        reflect_tables(_engine)
+    return _engine
 
 def reflect_tables(engine):
     global track_table
@@ -10,7 +27,7 @@ def reflect_tables(engine):
     track_table = metadata.tables["track"]
 
 def get_existing_tracks(session: Session, names=None, artists=None):
-    if not track_table:
+    if track_table is None:
         raise Exception("track_table not initialized")
 
     if names and artists:
@@ -30,7 +47,7 @@ def get_existing_tracks(session: Session, names=None, artists=None):
 
     if names and artists:
         return {
-            (row["track_name"], row["artist"]): dict(row._mapping)
+            (row._mapping["track_name"], row._mapping["artist"]): dict(row._mapping)
             for row in rows
         }
     else:
@@ -38,3 +55,4 @@ def get_existing_tracks(session: Session, names=None, artists=None):
 
 def insert_tracks(session: Session, track_data):
     session.execute(track_table.insert(), track_data)
+    session.commit()
