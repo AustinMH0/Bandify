@@ -26,7 +26,12 @@ describe('Playlist Flow - Mocked Backend', () => {
       ]
     }).as('mockGetTracks');
 
-    cy.visit('http://localhost:5173/');
+    // The app only asks for playlists once a sign-in session is stored
+    cy.visit('http://localhost:5173/', {
+      onBeforeLoad(win) {
+        win.sessionStorage.setItem('groovonomy_session', 'test-session');
+      }
+    });
   });
 
   it('loads playlists and shows track(s) when clicked', () => {

@@ -8,6 +8,7 @@ import PlaylistTable from "../PlaylistTable/PlaylistTable";
 import HeroBox from "../HeroBox/HeroBox";
 import Header from "../Header/Header";
 
+import { authHeaders, clearSession, hasSession } from "../../api/session";
 import type { Playlist } from "../../types/types";
 
 export function Main() {
@@ -20,11 +21,14 @@ export function Main() {
 
   useEffect(() => {
     const fetchUser = async () => {
+      if (!hasSession()) return;
+
       try {
         const response = await fetch(`${baseURL}/get_playlists`, {
-          credentials: "include",
+          headers: authHeaders(),
         });
 
+        if (response.status === 401) clearSession();
         if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
 
         const data = await response.json();

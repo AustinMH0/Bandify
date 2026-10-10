@@ -50,7 +50,7 @@ export default function HeroLoginCard({ onBack, classes }: any) {
           >
             <button
               className={`${classes.animatedButton} ${classes.greenMode}`}
-              onClick={() => (window.location.href = `${baseURL}/get_playlists`)}
+              onClick={() => (window.location.href = `${baseURL}/login`)}
             >
               <IconBrandSpotify size={22} style={{ position: "relative", top: "1px" }} />
               Log in
