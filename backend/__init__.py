@@ -19,7 +19,7 @@ def create_app():
 
     CORS(app, supports_credentials=True, origins=[
         "http://localhost:5173", 
-        "https:groovonomy.com"
+        "https://groovonomy.com"
         ])
     app.config['SECRET_KEY'] = urandom(64)
     app.config['SESSION_COOKIE_NAME'] = 'groovonomy_session'

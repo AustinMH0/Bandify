@@ -17,6 +17,7 @@ import classes from "../PlaylistTable/PlaylistTable.module.css";
 import LoadingRipple from "../LoadingAnimation/LoadingRipple";
 import PlaylistSort from "../PlaylistSort/PlaylistSort";
 
+import { authHeaders, hasSession } from "../../api/session";
 import type { Playlist } from "../../types/types";
 
 interface Track {
@@ -99,9 +100,11 @@ const PlaylistTable = ({
 
       const baseURL = import.meta.env.VITE_SEARCHRESULTS_API;
 
+      if (!hasSession()) return;
+
       try {
         const response = await axios.get(`${baseURL}/get_playlists`, {
-          withCredentials: true,
+          headers: authHeaders(),
         });
         const data = response.data;
         setUser({
@@ -130,7 +133,7 @@ const PlaylistTable = ({
     setLoading(true);
     try {
       const response = await axios.get(`${baseURL}/get_tracks/${playlistId}`, {
-        withCredentials: true,
+        headers: authHeaders(),
       });
       const data: Track[] = response.data;
       setTracks((prev) => ({ ...prev, [playlistId]: data }));
@@ -153,8 +156,7 @@ const PlaylistTable = ({
         `${baseURL}/db_results`,
         {
           tracks: tracks[selectedPlaylist],
-        },
-        { withCredentials: true }
+        }
       );
 
       const data = response.data;

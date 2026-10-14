@@ -4,7 +4,7 @@ const Login = () => {
   const baseURL = import.meta.env.VITE_SEARCHRESULTS_API;
 
   const handleLogin = () => {
-    window.location.href = `${baseURL}/get_playlists`;
+    window.location.href = `${baseURL}/login`;
   };
 
   return <Button onClick={handleLogin}>Login with Spotify</Button>;

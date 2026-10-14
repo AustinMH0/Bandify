@@ -1,58 +1,117 @@
+import datetime
+import decimal
 import json
 import os
-from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from db import get_existing_tracks, insert_tracks, reflect_tables
+import spotify_auth
+from db import get_engine, get_existing_tracks, insert_tracks
 from search_tracks import get_api_prices
 
-engine = create_engine(os.environ['DB_URL'])
-reflect_tables(engine)
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://groovonomy.com").rstrip("/")
 
-def lambda_handler(event, context):
-    headers = {
-        "Access-Control-Allow-Origin": "https://groovonomy.com",
-        "Access-Control-Allow-Credentials": "true",
-        "Access-Control-Allow-Headers": "*",
-        "Access-Control-Allow-Methods": "OPTIONS,GET,POST"
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": FRONTEND_URL,
+    "Access-Control-Allow-Headers": "Content-Type,Authorization",
+    "Access-Control-Allow-Methods": "OPTIONS,GET,POST",
+    "Access-Control-Max-Age": "600",
+    "Cache-Control": "no-store",
+}
+
+def json_default(value):
+    # Postgres NUMERIC and TIMESTAMP columns come back as Decimal and datetime
+    if isinstance(value, decimal.Decimal):
+        return float(value)
+    if isinstance(value, (datetime.datetime, datetime.date)):
+        return value.isoformat()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+def respond(status, body):
+    return {
+        "statusCode": status,
+        "headers": CORS_HEADERS,
+        "body": json.dumps(body, default=json_default)
     }
 
-    path = event.get("path", "")
-    method = event.get("httpMethod", "")
+def redirect(location, set_cookie=None):
+    headers = {"Location": location, "Cache-Control": "no-store"}
+    if set_cookie:
+        headers["Set-Cookie"] = set_cookie
+    return {"statusCode": 302, "headers": headers, "body": ""}
 
-    if path == "/get_playlists" and method == "GET":
+def lambda_handler(event, context):
+    path = event.get("path", "").rstrip("/")
+    method = event.get("httpMethod", "")
+    request_headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+
+    # CORS preflight, e.g. for the JSON POST to /db_results
+    if method == "OPTIONS":
+        return {"statusCode": 204, "headers": CORS_HEADERS, "body": ""}
+
+    try:
+        return route(event, path, method, request_headers)
+    except spotify_auth.AuthError:
+        return respond(401, {"error": "Unauthorized"})
+    except spotify_auth.ConfigError as e:
+        print("Configuration error:", str(e))
+        return respond(500, {"error": "Spotify sign-in is not configured", "detail": str(e)})
+    except spotify_auth.SpotifyError as e:
+        print("Spotify error:", str(e))
+        return respond(502, {"error": "Spotify request failed", "detail": str(e)})
+    except SQLAlchemyError as e:
+        print("Database error:", str(e))
+        return respond(503, {"error": "Database unavailable"})
+
+def route(event, path, method, request_headers):
+    # Spotify sign-in: /login -> Spotify -> /callback -> back to the front end
+    if path == "/login" and method == "GET":
+        location, cookie = spotify_auth.login(event)
+        return redirect(location, cookie)
+
+    if path == "/callback" and method == "GET":
         try:
-            with Session(engine) as session:
-                db_tracks = get_existing_tracks(session)  # no filters
-                return {
-                    "statusCode": 200,
-                    "headers": headers,
-                    "body": json.dumps(db_tracks)
-                }
-        except Exception as e:
-            print("Error in /get_playlists:", str(e))
-            return {
-                "statusCode": 500,
-                "headers": headers,
-                "body": json.dumps({"message": "Internal server error"})
-            }
+            session_token, cookie = spotify_auth.callback(event, request_headers)
+        except spotify_auth.AuthError as e:
+            print("Sign-in did not complete:", str(e))
+            return redirect(f"{FRONTEND_URL}/#login_error=sign_in_failed")
+        except spotify_auth.SpotifyError as e:
+            print("Spotify error during sign-in:", str(e))
+            return redirect(f"{FRONTEND_URL}/#login_error=spotify_unavailable")
+        # The fragment never reaches a server, so the session stays out of access logs
+        return redirect(f"{FRONTEND_URL}/#session={session_token}", cookie)
+
+    # The signed-in user's playlists
+    if path == "/get_playlists" and method == "GET":
+        token = spotify_auth.access_token(request_headers)
+        return respond(200, spotify_auth.get_playlists(token))
+
+    if path.startswith("/get_tracks/") and method == "GET":
+        token = spotify_auth.access_token(request_headers)
+        playlist_id = path[len("/get_tracks/"):]
+        return respond(200, spotify_auth.get_tracks(token, playlist_id))
+
+    # every track price already stored in the database
+    if path == "/db_results" and method == "GET":
+        with Session(get_engine()) as session:
+            db_tracks = get_existing_tracks(session)  # no filters
+        return respond(200, db_tracks)
 
     # existing search route
-    if method == "POST":
-        body = json.loads(event['body'])
+    if path == "/db_results" and method == "POST":
+        try:
+            body = json.loads(event.get('body') or '{}')
+        except ValueError:
+            return respond(400, {"error": "Invalid JSON body"})
         tracks = body.get('tracks', [])
 
         if not tracks:
-            return {
-                "statusCode": 400,
-                "headers": headers,
-                "body": json.dumps({"error": "No tracks provided"})
-            }
+            return respond(400, {"error": "No tracks provided"})
 
         song_names = [t['name'] for t in tracks]
         artists = [t['artist'] for t in tracks]
 
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             db_dict = get_existing_tracks(session, song_names, artists)
 
             final_data = []
@@ -77,14 +136,6 @@ def lambda_handler(event, context):
             if new_data:
                 insert_tracks(session, new_data)
 
-        return {
-            "statusCode": 200,
-            "headers": headers,
-            "body": json.dumps(final_data)
-        }
+        return respond(200, final_data)
 
-    return {
-        "statusCode": 404,
-        "headers": headers,
-        "body": json.dumps({"error": "Not found"})
-    }
+    return respond(404, {"error": "Not found"})
