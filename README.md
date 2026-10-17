@@ -25,8 +25,24 @@ Chromium, and `PLAYWRIGHT_OUTPUT_DIR` can redirect test artifacts (default: `/tm
 
 Store matching requires matching artist credits and an exact normalized title
 (or the store's `Original Mix` suffix). Unrequested cover/remix/karaoke/tribute/
-instrumental versions return N/A. Historical database rows record the requested
-artist, not the matched store artist, so price lookups currently recheck stores
-and refresh successful rows in place. Persistent cache reuse needs a future schema
-migration recording per-store matched identity, matcher version, and expiry;
-existing rows must not be labeled as validated without being rechecked.
+instrumental versions return N/A. POST price lookups reuse each store's saved
+price only when its matched identity and matcher version are validated and its
+validation timestamp is fresh. `PRICE_CACHE_TTL_SECONDS` on SearchResults sets
+the freshness window (default `604800`, seven days; `0` disables reuse). Completed
+no-match searches also expire after this window. Failed stores are retried on
+the next lookup; successful stores are saved independently. Stale or unvalidated
+prices are never returned as a fallback when a store fails.
+
+On deploy, release the Playwright scraper before SearchResults (the existing
+workflow already uses this order). On its first database access, SearchResults'
+existing lazy DB setup runs an idempotent migration adding nullable
+`<store>_matcher_version`, `<store>_matched_artist`, `<store>_matched_title` and
+`<store>_validated_at` columns to `track` for iTunes, Bandcamp and Beatport. The
+database role must own `track` or otherwise be permitted to `ALTER TABLE`; if
+the runtime role cannot migrate, an operator must run
+`python -c 'import db; db.get_engine()'` using a migration-capable `DB_URL`
+from the SearchResults source directory before rollout. No price rows are
+backfilled as validated: legacy rows and older scraper responses are rechecked.
+PostgreSQL timestamps use UTC with time zone. Bump `MATCHER_VERSION` in both
+identical `search/matching.py` copies when matching rules or provider identity
+extraction change. No frontend migration is needed.

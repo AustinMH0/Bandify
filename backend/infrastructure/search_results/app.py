@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 import spotify_auth
 from db import get_engine, get_existing_tracks, insert_tracks
 from search_tracks import get_api_prices
+from price_cache import STORES, PROVENANCE_FIELDS, is_fresh, utcnow
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://groovonomy.com").rstrip("/")
 
@@ -111,19 +112,40 @@ def route(event, path, method, request_headers):
         with Session(get_engine()) as session:
             final_data = []
             new_data = []
+            existing = get_existing_tracks(session, [track['name'] for track in tracks],
+                                           [track['artist'] for track in tracks])
 
             for track in tracks:
-                # Stored rows have only the REQUESTED identity, not the artist
-                # returned by each store or a matcher version. They cannot prove
-                # that any cached price passed validation. Recheck on lookup
-                # until the schema can record per-store validation provenance.
-                song_data = get_api_prices(track['artist'], track['name'])
-                song_data['track_name'] = track['name']
-                song_data['artist'] = track['artist']
-                # Transport/browser failures are retryable; return partial fresh
-                # results without overwriting stored data or falling back to it.
-                if not song_data.get('errors'):
-                    new_data.append({k: v for k, v in song_data.items() if k != 'errors'})
+                artist, title = track['artist'], track['name']
+                saved = existing.get((title, artist), {})
+                now = utcnow()
+                pending = [store for store in STORES if not is_fresh(saved, store, artist, title, now)]
+                song_data = {'track_name': title, 'artist': artist, 'errors': [],
+                             'created_at': saved.get('created_at')}
+                for store in STORES:
+                    song_data[f'{store}_price'] = saved.get(f'{store}_price', -1) if store not in pending else -1
+                    song_data[f'{store}_url'] = saved.get(f'{store}_url', '') if store not in pending else ''
+
+                if pending:
+                    fresh = get_api_prices(artist, title, stores=pending)
+                    song_data['errors'] = fresh.get('errors', [])
+                    song_data['created_at'] = fresh.get('created_at')
+                    successful = [store for store in pending if store not in song_data['errors']]
+                    update = {'track_name': title, 'artist': artist}
+                    for store in pending:
+                        for field in ('price', 'url'):
+                            key = f'{store}_{field}'
+                            song_data[key] = fresh.get(key, -1 if field == 'price' else '')
+                        # Preserve failed stores in storage, but never return their
+                        # stale prices. Save successful providers independently.
+                        if store in successful:
+                            for field in ('price', 'url', *PROVENANCE_FIELDS):
+                                key = f'{store}_{field}'
+                                update[key] = fresh.get(key)
+                    if successful:
+                        update['created_at'] = fresh.get('created_at')
+                        new_data.append(update)
+                        existing[(title, artist)] = {**saved, **update}
                 final_data.append(song_data)
 
 

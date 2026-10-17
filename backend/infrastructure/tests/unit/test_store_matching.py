@@ -13,7 +13,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = Path(__file__).with_name('fixtures')
-NOT_FOUND = {'price': -1, 'url': ''}
+NOT_FOUND = {'price': -1, 'url': '', 'matcher_version': 'artist-title-v1',
+             'matched_artist': None, 'matched_title': None}
 
 
 @pytest.fixture(params=['search_results', 'playwright_function'])
@@ -106,6 +107,9 @@ def test_itunes_skips_cover_and_versions_and_prefers_exact(stores, monkeypatch):
     monkeypatch.setattr(module.requests, 'get', lambda *args, **kwargs: Response())
     result = module.ItuneSearch.search_song('The Weeknd', 'Blinding Lights')
     assert result['price'] == 1.29
+    assert result['matched_artist'] == 'The Weeknd'
+    assert result['matched_title'] == 'Blinding Lights'
+    assert result['matcher_version'] == 'artist-title-v1'
     assert '/after-hours/' in result['url']
     assert 'geo.itunes.apple.com' in result['url']
     payload['results'] = [payload['results'][0], payload['results'][1], payload['results'][4]]
@@ -130,6 +134,9 @@ def test_html_providers_choose_exact_among_multiple_rows(stores, monkeypatch, pr
     cls = module.BandcampSearch if provider == 'bandcamp' else module.BeatportSearch
     result = cls().search_song('Blinding Lights', 'The Weeknd')
     assert result['price'] == (1.29 if provider == 'bandcamp' else 1.49)
+    assert result['matched_artist'] == ('The Weeknd' if provider == 'bandcamp' else 'Other, The Weeknd')
+    assert result['matched_title'] == 'Blinding Lights'
+    assert result['matcher_version'] == 'artist-title-v1'
     assert result['url'].endswith('/blinding-lights' if provider == 'bandcamp' else '/blinding-lights/103')
     if provider == 'bandcamp':
         assert len(pages) == 2

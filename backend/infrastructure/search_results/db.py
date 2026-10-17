@@ -1,7 +1,9 @@
 import os
 
-from sqlalchemy import create_engine, MetaData, and_, or_
+from sqlalchemy import create_engine, MetaData, and_, or_, inspect, text
 from sqlalchemy.orm import Session
+
+from price_cache import STORES
 
 # Seconds to wait for the Postgres TCP connect before giving up
 DB_CONNECT_TIMEOUT = 5
@@ -23,8 +25,27 @@ def get_engine():
 
 def reflect_tables(engine):
     global track_table
+    migrate_price_validation(engine)
+    metadata.clear()
     metadata.reflect(bind=engine, only=["track"])
     track_table = metadata.tables["track"]
+
+def migrate_price_validation(engine):
+    """Add nullable provenance on first DB use; never certify legacy prices.
+
+    Postgres IF NOT EXISTS handles simultaneous Lambda cold starts. Migration
+    runs before reflection and only once per initialized application instance.
+    """
+    with engine.begin() as connection:
+        columns = {column["name"] for column in inspect(connection).get_columns("track")}
+        timestamp_type = "TIMESTAMP WITH TIME ZONE" if engine.dialect.name == "postgresql" else "TIMESTAMP"
+        for store in STORES:
+            for field, column_type in (("matcher_version", "TEXT"), ("matched_artist", "TEXT"),
+                                       ("matched_title", "TEXT"), ("validated_at", timestamp_type)):
+                name = f"{store}_{field}"
+                if name not in columns:
+                    guard = "IF NOT EXISTS " if engine.dialect.name == "postgresql" else ""
+                    connection.execute(text(f"ALTER TABLE track ADD COLUMN {guard}{name} {column_type}"))
 
 def get_existing_tracks(session: Session, names=None, artists=None):
     if track_table is None:

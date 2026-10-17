@@ -26,6 +26,12 @@ def lambda_handler(event, context):
             "body": json.dumps({"error": "Missing artist or track_name"})
         }
 
+    stores = payload.get("stores", ["bandcamp", "beatport"])
+    if not isinstance(stores, list) or not stores or any(
+        store not in ("bandcamp", "beatport") for store in stores
+    ):
+        return {"statusCode": 400, "body": json.dumps({"error": "Invalid stores"})}
+
     results = {}
     errors = []
     # Each provider owns its browser in its own thread. One store failing must
@@ -34,6 +40,7 @@ def lambda_handler(event, context):
         futures = {
             name: pool.submit(search().search_song, track_name, artist)
             for name, search in [("bandcamp", BandcampSearch), ("beatport", BeatportSearch)]
+            if name in stores
         }
         for name, future in futures.items():
             try:

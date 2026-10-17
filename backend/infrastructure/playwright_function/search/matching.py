@@ -2,6 +2,16 @@
 import re
 import unicodedata
 
+# Bump when matching rules or provider identity extraction change. Deploy both
+# Lambda copies together so an older scraper cannot validate a newer cache row.
+MATCHER_VERSION = "artist-title-v1"
+
+
+def store_result(price=-1, url="", matched_artist=None, matched_title=None):
+    """A completed search, including a validated no-match result."""
+    return {"price": price, "url": url, "matcher_version": MATCHER_VERSION,
+            "matched_artist": matched_artist, "matched_title": matched_title}
+
 
 def normalize(value):
     if not isinstance(value, str):

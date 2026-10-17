@@ -46,3 +46,22 @@ def test_one_store_failure_preserves_the_other_price(scraper, monkeypatch):
     assert data["bandcamp"]["price"] == -1
     assert data["beatport"]["price"] == 1.49
     assert data["errors"] == ["bandcamp"]
+
+
+def test_scraper_skips_fresh_store(scraper, monkeypatch):
+    def must_not_search(*args):
+        raise AssertionError("Fresh store must not be queried")
+
+    monkeypatch.setattr(scraper.BandcampSearch, "search_song", must_not_search)
+    response = scraper.lambda_handler({"artist": "X", "track_name": "New Song", "stores": ["beatport"]}, None)
+    data = json.loads(response["body"])
+    assert response["statusCode"] == 200
+    assert "bandcamp" not in data
+    assert data["beatport"]["price"] == 1.49
+    assert data["errors"] == []
+
+
+@pytest.mark.parametrize("stores", [[], "beatport", ["itunes"], None])
+def test_scraper_rejects_invalid_store_selection(scraper, stores):
+    response = scraper.lambda_handler({"artist": "X", "track_name": "New Song", "stores": stores}, None)
+    assert response["statusCode"] == 400

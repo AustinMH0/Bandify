@@ -21,9 +21,10 @@ def scraper(monkeypatch):
     spec = importlib.util.spec_from_file_location("scraper_app", ROOT / "playwright_function/app.py")
     app = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(app)
+    from scraper_search.matching import store_result
+
     for cls, price in [(app.BandcampSearch, 0.99), (app.BeatportSearch, 1.49)]:
-        monkeypatch.setattr(cls, "search_song", lambda self, track, artist, price=price: {
-            "price": price, "url": f"https://store.example/{track}",
-        })
+        monkeypatch.setattr(cls, "search_song", lambda self, track, artist, price=price: store_result(
+            price, f"https://store.example/{track}", artist, track))
     return app
 
