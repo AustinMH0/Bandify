@@ -2,7 +2,7 @@ from urllib.parse import quote, urljoin
 from bs4 import BeautifulSoup
 from time import monotonic
 from .browser import page_html
-from .matching import match_rank
+from .matching import match_rank, store_result
 
 
 class BeatportSearch:
@@ -27,14 +27,14 @@ class BeatportSearch:
             rank = match_rank(artist_name, track_name, credited, candidate)
             anchor = row.select_one('a[href*="/track/"]')
             if rank is not None and anchor:
-                matches.append((rank, row, anchor['href']))
+                matches.append((rank, row, anchor['href'], credited, candidate))
         if not matches:
-            return {'price': -1, 'url': ''}
+            return store_result()
 
-        _, row, href = min(matches, key=lambda item: item[0])
+        _, row, href, credited, candidate = min(matches, key=lambda item: item[0])
         price_span = row.find('span', class_='price')
         try:
             price = float(price_span.get_text(strip=True).replace('$', '')) if price_span else -1
         except ValueError:
             price = -1
-        return {'price': price, 'url': urljoin('https://www.beatport.com', href)}
+        return store_result(price, urljoin('https://www.beatport.com', href), credited, candidate)

@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote
 from time import monotonic
 from .browser import page_html
-from .matching import match_rank
+from .matching import match_rank, store_result
 import re
 from .currency_converter import CurrencyConverter
 
@@ -24,7 +24,7 @@ class BandcampSearch:
             if rank is not None:
                 matches.append((rank, heading['href']))
         if not matches:
-            return {'price': -1, 'url': ''}
+            return store_result()
 
         track_url = min(matches, key=lambda item: item[0])[1]
         track_soup = BeautifulSoup(page_html(track_url, deadline), 'html.parser')
@@ -34,7 +34,7 @@ class BandcampSearch:
         if not title or not artist or match_rank(
             artist_name, track_name, artist.get_text(" ", strip=True), title.get_text(" ", strip=True)
         ) is None:
-            return {'price': -1, 'url': ''}
+            return store_result()
 
         price = -1
         buy_item = track_soup.select_one('li.buyItem:has(h4:-soup-contains("Buy Digital Track"))')
@@ -53,4 +53,5 @@ class BandcampSearch:
                         price = CurrencyConverter.convert_to_usd(currency, amount)
                     elif currency == 'USD':
                         price = round(amount, 2)
-        return {'price': price, 'url': track_url}
+        return store_result(price, track_url, artist.get_text(" ", strip=True),
+                            title.get_text(" ", strip=True))

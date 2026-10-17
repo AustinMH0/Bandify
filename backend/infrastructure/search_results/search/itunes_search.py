@@ -1,6 +1,6 @@
 import requests
 from urllib.parse import quote
-from .matching import match_rank
+from .matching import match_rank, store_result
 
 class ItuneSearch:
     def __init__(self):
@@ -29,11 +29,12 @@ class ItuneSearch:
                 if 'music.apple.com' in track_url:
                     track_url = track_url.replace('music.apple.com', 'geo.itunes.apple.com')
                     track_url += '?ls=1&app=itunes'
-                return {'price': result.get('trackPrice', -1), 'url': track_url}
+                return store_result(result.get('trackPrice', -1), track_url,
+                                    result['artistName'], result['trackName'])
 
         except requests.exceptions.RequestException as e:
             print(f'iTunes lookup failed: {type(e).__name__}')
             return {'price': -1, 'url': '', 'error': 'itunes'}
 
         #sleep(2)
-        return {'price': -1, 'url': ''}
+        return store_result()

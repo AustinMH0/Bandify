@@ -1,50 +1,50 @@
-import datetime
 import os
 import requests
 from search import ItuneSearch
+from price_cache import STORES, PROVENANCE_FIELDS, has_provenance, utcnow
 
 PLAYWRIGHT_API_URL = os.environ.get("PLAYWRIGHT_API_URL")
 
-def get_api_prices(artist, track_name):
-    timestamp = datetime.datetime.now()
 
+def get_api_prices(artist, track_name, stores=STORES):
+    """Search only requested stores and retain each provider's own provenance."""
+    results = {}
+    errors = []
+    if "itunes" in stores:
+        results["itunes"] = ItuneSearch.search_song(artist, track_name)
+        if results["itunes"].get("error"):
+            errors.append("itunes")
 
-    itunes_data = ItuneSearch.search_song(artist, track_name)
-
-
-    bandcamp_data = {"price": -1, "url": ""}
-    beatport_data = {"price": -1, "url": ""}
-
-    errors = ["itunes"] if itunes_data.get("error") else []
-    # Call the Playwright Lambda for Bandcamp & Beatport
-    if PLAYWRIGHT_API_URL:
-        try:
-            response = requests.post(
-                f"{PLAYWRIGHT_API_URL}",
-                json={"artist": artist, "track_name": track_name},
-                timeout=(2, 16)
-            )
-            if response.status_code == 200:
+    browser_stores = [store for store in stores if store in ("bandcamp", "beatport")]
+    if browser_stores:
+        if PLAYWRIGHT_API_URL:
+            try:
+                response = requests.post(
+                    PLAYWRIGHT_API_URL,
+                    json={"artist": artist, "track_name": track_name, "stores": browser_stores},
+                    timeout=(2, 16),
+                )
+                response.raise_for_status()
                 data = response.json()
-                bandcamp_data = data.get("bandcamp", bandcamp_data)
-                beatport_data = data.get("beatport", beatport_data)
-                errors.extend(data.get("errors", []))
-            else:
-                print(f"Playwright Lambda returned {response.status_code}")
-                errors.extend(["bandcamp", "beatport"])
-        except Exception as e:
-            print(f"Playwright lookup failed: {type(e).__name__}")
-            errors.extend(["bandcamp", "beatport"])
-    else:
-        errors.extend(["bandcamp", "beatport"])
+                for store in browser_stores:
+                    if not isinstance(data.get(store), dict) or store in data.get("errors", []):
+                        errors.append(store)
+                    else:
+                        results[store] = data[store]
+            except Exception as exc:
+                print(f"Playwright lookup failed: {type(exc).__name__}")
+                errors.extend(browser_stores)
+        else:
+            errors.extend(browser_stores)
 
-    return {
-        "itunes_price": itunes_data.get("price"),
-        "itunes_url": itunes_data.get("url"),
-        "bandcamp_price": bandcamp_data.get("price"),
-        "bandcamp_url": bandcamp_data.get("url"),
-        "beatport_price": beatport_data.get("price"),
-        "beatport_url": beatport_data.get("url"),
-        "errors": errors,
-        "created_at": timestamp
-    }
+    timestamp = utcnow()
+    prices = {"errors": errors, "created_at": timestamp}
+    for store in stores:
+        result = results.get(store, {}) if store not in errors else {}
+        prices[f"{store}_price"] = result.get("price", -1)
+        prices[f"{store}_url"] = result.get("url", "")
+        for field in PROVENANCE_FIELDS:
+            prices[f"{store}_{field}"] = result.get(field) if field != "validated_at" else None
+        if store not in errors and has_provenance(prices, store, artist, track_name):
+            prices[f"{store}_validated_at"] = timestamp
+    return prices
