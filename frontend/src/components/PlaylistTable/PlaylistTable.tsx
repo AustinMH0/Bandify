@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import {
+  Alert,
   Button,
   Card,
   Grid,
@@ -25,6 +26,26 @@ interface Track {
   artist: string;
 }
 
+interface SongPrice {
+  track_name: string;
+  artist: string;
+  itunes_price: number | null;
+  itunes_url: string;
+  bandcamp_price: number | null;
+  bandcamp_url: string;
+  beatport_price: number | null;
+  beatport_url: string;
+  errors?: string[];
+}
+
+const trackKey = (track: Track) => JSON.stringify([track.name, track.artist]);
+
+const PriceCell = ({ price, url }: { price?: number | null; url?: string }) => {
+  if (price == null || !Number.isFinite(price) || price < 0) return <>N/A</>;
+  const label = `$${price.toFixed(2)}`;
+  return url ? <a href={url}>{label}</a> : <>{label}</>;
+};
+
 const PlaylistTable = ({
   playlists,
   setPlaylists,
@@ -37,26 +58,13 @@ const PlaylistTable = ({
   const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
   const [user, setUser] = useState<{ id: string; display_name: string; profile_picture: string | null; } | null>(null);
-  const [, setPriceTable] = useState(false);
   const [showTrackTable, setTrackTable] = useState(false);
-  const [tableButton, setTableButton] = useState("View Prices");
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [songPrices, setSongPrices] = useState<
-    Record<
-      string,
-      {
-        itunesPrice: number;
-        itunesUrl: string;
-        beatPortPrice: number;
-        beatPortUrl: string;
-        bandCampPrice: number;
-        bandCampUrl: string;
-      } | null
-    >
-  >({});
-
-
+  const [fetchingPrices, setFetchingPrices] = useState(false);
+  const [priceProgress, setPriceProgress] = useState(0);
+  const [priceError, setPriceError] = useState("");
+  const [songPrices, setSongPrices] = useState<Record<string, SongPrice>>({});
 
   const theme = useMantineTheme();
 
@@ -147,49 +155,36 @@ const PlaylistTable = ({
 
   const fetchSongPrices = async () => {
     if (!selectedPlaylist || !tracks[selectedPlaylist]) return;
-    setLoading(true);
-
+    setFetchingPrices(true);
+    setTrackTable(false);
+    setPriceProgress(0);
+    setPriceError("");
     const baseURL = import.meta.env.VITE_SEARCHRESULTS_API;
 
     try {
-      const response = await axios.post(
-        `${baseURL}/db_results`,
-        {
-          tracks: tracks[selectedPlaylist],
+      // A cache miss can take several seconds. Never put a whole playlist
+      // behind one API Gateway/Lambda deadline or discard completed tracks.
+      for (const [index, track] of tracks[selectedPlaylist].entries()) {
+        try {
+          const response = await axios.post<SongPrice[]>(`${baseURL}/db_results`, {
+            tracks: [track],
+          });
+          const item = response.data.find(
+            (item) => item.track_name === track.name && item.artist === track.artist
+          );
+          if (!item) throw new Error("Missing track in price response");
+          setSongPrices((prev) => ({ ...prev, [trackKey(track)]: item }));
+          if (item.errors?.length) {
+            setPriceError("Some stores could not be reached. Retry to look up missing prices.");
+          }
+        } catch (error) {
+          console.error("Error fetching song prices:", error);
+          setPriceError("Some prices could not be fetched. Retry to look up missing prices.");
         }
-      );
-
-      const data = response.data;
-      const priceMap: Record<
-        string,
-        {
-          itunesPrice: number;
-          itunesUrl: string;
-          beatPortPrice: number;
-          beatPortUrl: string;
-          bandCampPrice: number;
-          bandCampUrl: string;
-        } | null
-      > = {};
-
-      data.forEach((item: any) => {
-        if (item.track_name && item.artist) {
-          priceMap[item.track_name] = {
-            itunesPrice: item.itunes_price,
-            itunesUrl: item.itunes_url,
-            bandCampPrice: item.bandcamp_price,
-            bandCampUrl: item.bandcamp_url,
-            beatPortPrice: item.beatport_price,
-            beatPortUrl: item.beatport_url,
-          };
-        }
-      });
-
-      setSongPrices(priceMap);
-    } catch (error) {
-      console.error("Error fetching song prices: ", error);
+        setPriceProgress(index + 1);
+      }
     } finally {
-      setLoading(false);
+      setFetchingPrices(false);
     }
   };
 
@@ -224,6 +219,7 @@ const PlaylistTable = ({
                             padding="lg"
                             onClick={() => {
                               setSelectedPlaylist(playlist.id);
+                              setPriceError("");
                               setModalOpened(true);
                               fetchTracks(playlist.id);
                             }}
@@ -265,9 +261,11 @@ const PlaylistTable = ({
 
           <Modal
             opened={modalOpened}
+            closeOnClickOutside={!fetchingPrices}
+            closeOnEscape={!fetchingPrices}
+            withCloseButton={!fetchingPrices}
             onClose={() => {
               setModalOpened(false);
-              setPriceTable(false);
               setTrackTable(true);
             }}
             overlayProps={{
@@ -302,6 +300,8 @@ const PlaylistTable = ({
             }}
           >
             <div style={{ flex: 1, overflowY: "auto", paddingBottom: "60px" }}>
+              {fetchingPrices && <Text role="status">Looking up prices: {priceProgress}/{selectedPlaylist ? tracks[selectedPlaylist]?.length : 0}</Text>}
+              {priceError && <Alert color="red" role="alert">{priceError}</Alert>}
               {loading ? (
                 <LoadingRipple />
               ) : selectedPlaylist && tracks[selectedPlaylist]?.length > 0 ? (
@@ -339,31 +339,13 @@ const PlaylistTable = ({
                         <Table.Tr key={index}>
                           <Table.Td>{track.name}</Table.Td>
                           <Table.Td>
-                            {songPrices[track.name] ? (
-                              <a href={songPrices[track.name]?.bandCampUrl ?? "#"}>
-                                {songPrices[track.name]?.bandCampPrice ?? "$--"}
-                              </a>
-                            ) : (
-                              ""
-                            )}
+                            <PriceCell price={songPrices[trackKey(track)]?.bandcamp_price} url={songPrices[trackKey(track)]?.bandcamp_url} />
                           </Table.Td>
                           <Table.Td>
-                            {songPrices[track.name] ? (
-                              <a href={songPrices[track.name]?.beatPortUrl ?? "#"}>
-                                {songPrices[track.name]?.beatPortPrice ?? "$--"}
-                              </a>
-                            ) : (
-                              ""
-                            )}
+                            <PriceCell price={songPrices[trackKey(track)]?.beatport_price} url={songPrices[trackKey(track)]?.beatport_url} />
                           </Table.Td>
                           <Table.Td>
-                            {songPrices[track.name] ? (
-                              <a href={songPrices[track.name]?.itunesUrl ?? "#"}>
-                                {songPrices[track.name]?.itunesPrice ?? "$--"}
-                              </a>
-                            ) : (
-                              ""
-                            )}
+                            <PriceCell price={songPrices[trackKey(track)]?.itunes_price} url={songPrices[trackKey(track)]?.itunes_url} />
                           </Table.Td>
                         </Table.Tr>
                       ))}
@@ -390,20 +372,16 @@ const PlaylistTable = ({
                 fullWidth
                 variant="outline"
                 color="grape"
-                onClick={async () => {
-                  if (showTrackTable) {
-                    await fetchSongPrices();
-                    setTrackTable(false);
-                    setPriceTable(true);
-                    setTableButton("View Playlist");
+                disabled={loading || fetchingPrices}
+                onClick={() => {
+                  if (showTrackTable || priceError) {
+                    void fetchSongPrices();
                   } else {
                     setTrackTable(true);
-                    setPriceTable(false);
-                    setTableButton("View Prices");
                   }
                 }}
               >
-                {tableButton}
+                {fetchingPrices ? "Looking Up Prices…" : showTrackTable ? "View Prices" : priceError ? "Retry Prices" : "View Playlist"}
               </Button>
             </div>
           </Modal>

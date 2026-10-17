@@ -399,5 +399,61 @@ def test_price_lookup_requires_tracks(app):
     assert response["statusCode"] == 400
 
 
+def test_new_track_crosses_scraper_http_boundary_and_is_committed(app, track_db, scraper, monkeypatch):
+    import search_tracks
+
+    calls = []
+    monkeypatch.setattr(search_tracks, "PLAYWRIGHT_API_URL", "https://scraper.example/playwright_function")
+    monkeypatch.setattr(search_tracks.ItuneSearch, "search_song", lambda *args: {"price": 1.29, "url": ""})
+
+    def proxy_post(url, json, timeout):
+        import json as json_module
+
+        assert url == search_tracks.PLAYWRIGHT_API_URL
+        assert timeout == (2, 16)
+        calls.append(json)
+        result = scraper.lambda_handler({"body": json_module.dumps(json), "httpMethod": "POST"}, None)
+        return FakeResponse(json_module.loads(result["body"]), result["statusCode"])
+
+    monkeypatch.setattr(search_tracks.requests, "post", proxy_post)
+    body = json.dumps({"tracks": [{"name": "New Song", "artist": "X"}]})
+    first = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    assert first["statusCode"] == 200
+    row = json.loads(first["body"])[0]
+    assert (row["itunes_price"], row["bandcamp_price"], row["beatport_price"]) == (1.29, 0.99, 1.49)
+    assert row["errors"] == []
+
+    # A fresh session reads the committed row; cached tracks bypass the stores.
+    second = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    assert second["statusCode"] == 200
+    assert json.loads(second["body"])[0]["bandcamp_price"] == 0.99
+    assert calls == [{"artist": "X", "track_name": "New Song"}]
+
+
+def test_transport_failure_returns_partial_prices_without_poisoning_cache(app, track_db, monkeypatch):
+    import search_tracks
+    import requests
+
+    monkeypatch.setattr(search_tracks, "PLAYWRIGHT_API_URL", "https://scraper.example/playwright_function")
+    monkeypatch.setattr(search_tracks.ItuneSearch, "search_song", lambda *args: {"price": 0.99, "url": ""})
+    calls = []
+
+    def unavailable(*args, **kwargs):
+        calls.append(1)
+        raise requests.exceptions.ReadTimeout()
+
+    monkeypatch.setattr(search_tracks.requests, "post", unavailable)
+    body = json.dumps({"tracks": [{"name": "New Song", "artist": "X"}]})
+    for _ in range(2):
+        response = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+        assert response["statusCode"] == 200
+        row = json.loads(response["body"])[0]
+        assert row["itunes_price"] == 0.99
+        assert row["errors"] == ["bandcamp", "beatport"]
+    assert len(calls) == 2
+    stored = app.lambda_handler(make_event("GET", "/db_results"), None)
+    assert json.loads(stored["body"]) == []
+
+
 def test_unknown_route_is_404(app):
     assert app.lambda_handler(make_event("GET", "/nope"), None)["statusCode"] == 404

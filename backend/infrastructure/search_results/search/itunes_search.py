@@ -1,7 +1,5 @@
 import requests
 from urllib.parse import quote
-from time import sleep
-from fake_useragent import UserAgent
 
 class ItuneSearch:
     def __init__(self):
@@ -11,13 +9,8 @@ class ItuneSearch:
     def search_song(artistName: str, trackName: str) -> dict:
         parameters = f'{trackName} {artistName}'
         url = f'https://itunes.apple.com/search?term={quote(parameters)}&entity=musicTrack&attribute=mixTerm&explicit=Yes'
-        ua = UserAgent()
-        headers = {
-            'User-Agent': ua.random
-        }
-
         try:
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, timeout=(2, 3))
             response.raise_for_status()
             jsResponse = response.json()
 
@@ -36,7 +29,8 @@ class ItuneSearch:
                     }
 
         except requests.exceptions.RequestException as e:
-            print(f'An error occurred while fetching data from iTunes: {e}')
+            print(f'iTunes lookup failed: {type(e).__name__}')
+            return {'price': -1, 'url': '', 'error': 'itunes'}
 
         #sleep(2)
         return {'price': -1, 'url': ''}

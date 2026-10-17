@@ -31,7 +31,7 @@ export default function HeroLoggedIn({ user, playlists, classes }: any) {
                 if (cardSection) cardSection.scrollIntoView({ behavior: "smooth", block: "start" });
               }}
             >
-              View Playlists
+              View Prices
             </button>
           </Group>
         </motion.div>

@@ -1,7 +1,8 @@
 import re
 from urllib.parse import quote
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
+from time import monotonic
+from .browser import page_html
 
 class BeatportSearch:
     def __init__(self):
@@ -18,13 +19,7 @@ class BeatportSearch:
         query = f'{track_name} {artist_name}'
         search_url = f'https://www.beatport.com/search?q={quote(query)}'
 
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto(search_url, timeout=0)
-            page.wait_for_timeout(500)
-            html = page.content()
-            browser.close()
+        html = page_html(search_url, monotonic() + 9)
 
         soup = BeautifulSoup(html, 'html.parser')
 
