@@ -2,172 +2,55 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote
 from time import monotonic
 from .browser import page_html
+from .matching import match_rank
 import re
 from .currency_converter import CurrencyConverter
 
+
 class BandcampSearch:
-    def __init__(self):
-        pass
-        
     def search_song(self, track_name: str, artist_name: str) -> dict:
         deadline = monotonic() + 9
         query = f'{track_name} {artist_name}'
         search_url = f'https://bandcamp.com/search?q={quote(query)}&item_type=t'
+        soup = BeautifulSoup(page_html(search_url, deadline), 'html.parser')
+        matches = []
+        for row in soup.select('li.searchresult'):
+            heading = row.select_one('.heading a')
+            subhead = row.select_one('.subhead')
+            if not heading or not heading.get('href') or not subhead:
+                continue
+            credited = re.sub(r'^by\s+', '', subhead.get_text(" ", strip=True), flags=re.I)
+            rank = match_rank(artist_name, track_name, credited, heading.get_text(" ", strip=True))
+            if rank is not None:
+                matches.append((rank, heading['href']))
+        if not matches:
+            return {'price': -1, 'url': ''}
 
-        html = page_html(search_url, deadline)
-        soup = BeautifulSoup(html, 'html.parser')
+        track_url = min(matches, key=lambda item: item[0])[1]
+        track_soup = BeautifulSoup(page_html(track_url, deadline), 'html.parser')
+        # Search snippets may be stale: confirm identity on the purchase page too.
+        title = track_soup.select_one('h2.trackTitle')
+        artist = track_soup.select_one('#name-section h3 a')
+        if not title or not artist or match_rank(
+            artist_name, track_name, artist.get_text(" ", strip=True), title.get_text(" ", strip=True)
+        ) is None:
+            return {'price': -1, 'url': ''}
 
-        result_row = soup.find('li', class_=lambda c: c and 'searchresult' in c)
-
-        track_url = ''
         price = -1
-
-        if result_row:
-            anchor = result_row.select_one('.heading a')
-            if anchor and anchor.has_attr('href'):
-                track_url = anchor['href']
-                # print(f'Track URL for {track_name}: {track_url}')
-
-                track_html = page_html(track_url, deadline)
-                track_soup = BeautifulSoup(track_html, 'html.parser')
-
-                nyp_span = track_soup.find('span', string=lambda text: text and 'name your price' in text.lower())
-                if nyp_span:
-                    price = 0.0
-
-                else:
-                    buy_item = track_soup.select_one('li.buyItem:has(h4:contains("Buy Digital Track"))')
-                    if buy_item and buy_item.select_one('span.base-text-color'):
-                        price_span = buy_item.select_one('span.base-text-color')
-
-                        price_text = price_span.get_text(strip=True)
-                        #print(f'Raw price text: {price_text}')
-
-                        # Extract currency symbol and amount
-                        match = re.match(r'([^\d]+)?([\d.]+)', price_text)
-                        if match:
-                            symbol = match.group(1).strip() if match.group(1) else '$'
-                            amount = float(match.group(2))
-
-                            # Currency symbol to code mapping
-                            currency_map = {
-                                    '€': 'EUR',
-                                    '£': 'GBP',
-                                    '$': 'USD',
-                                    '¥': 'JPY',
-                            }
-
-                            currency_code = currency_map.get(symbol)
-                            #print(f"Detected symbol: '{symbol}' | Code: {currency_code} | Amount: {amount}")
-
-                            if currency_code and currency_code != 'USD':
-                                price = CurrencyConverter.convert_to_usd(currency_code, amount)
-                            else:
-                                price = round(amount, 2)
-
+        buy_item = track_soup.select_one('li.buyItem:has(h4:-soup-contains("Buy Digital Track"))')
+        if buy_item:
+            nyp = buy_item.find('span', string=lambda text: text and 'name your price' in text.lower())
+            price_span = buy_item.select_one('span.base-text-color')
+            if nyp:
+                price = 0.0
+            elif price_span:
+                match = re.match(r'([^\d]+)?([\d.]+)', price_span.get_text(strip=True))
+                if match:
+                    symbol = match.group(1).strip() if match.group(1) else '$'
+                    amount = float(match.group(2))
+                    currency = {'€': 'EUR', '£': 'GBP', '$': 'USD', '¥': 'JPY'}.get(symbol)
+                    if currency and currency != 'USD':
+                        price = CurrencyConverter.convert_to_usd(currency, amount)
+                    elif currency == 'USD':
+                        price = round(amount, 2)
         return {'price': price, 'url': track_url}
-
-        # # Find first track result
-        # first_track = None
-        # for item in soup.select('li.searchresult'):
-        #     print(f'item: {item}')
-        #     item_type = item.select_one('.itemtype')
-        #     if item_type and item_type.text.strip().lower() == 'track':
-        #         first_track = item
-        #         break
-
-        # if not first_track:
-        #     print('No track result found')
-        #     return {'price': -1, 'url': search_url}
-
-        # heading = first_track.select_one('.heading a')
-        # url = heading['href']
-        # price_span = soup.select_one('span.base-text-color')
-        # price = price_span.get_text(strip = True) if price_span else 'N/A'
-
-        # return {
-        #     'price': price,
-        #     'url': url
-        # }
-
-
-        
-    
-    # def get_track_price(self, url):
-    #     # Visit track page
-    #     # self.driver.get(url)
-    #     #sleep(2)
-    #     returned = requests.get(url)
-    #     track_soup = BeautifulSoup(returned.content, 'html.parser')
-
-    #     price_span = track_soup.select_one('span.base-text-color')
-    #     price = price_span.get_text(strip=True) if price_span else 'Price not found'
-
-    #     #self.driver.quit()
-    #     return price
-
-
-# Example Usage:
-
-# import time
-# import queue
-# import threading
-
-
-# songsQueue = queue.Queue()
-    
-# songsQueue.put(('king von', 'armed and dangerous')),
-# songsQueue.put(('king von', 'took her to the o')),
-
-
-# songsQueue.put(('king von', 'gleesh place')),
-# songsQueue.put(('king von', 'crazy story')),
-
-
-# songsQueue.put(('king von', 'twin nem')),
-# songsQueue.put(('lil durk', 'green light')),
-
-
-# songsQueue.put(('lil baby', 'we paid')),
-# songsQueue.put(('juice wrld', 'syphilis')),
-    
-
-
-
-# Function to search for songs in a queue
-# def search_songs(songsQueue, results):
-#     while not songsQueue.empty():
-#         try:
-#             artist, song = songsQueue.get(timeout= 2)
-#         except queue.Empty:
-#             print('queue empty')
-#             return
-#         bc = BandcampSearch(song, artist)
-#         price = None
-#         url = bc.get_track_url()
-#         if url:
-#             price = bc.get_track_price(url)
-#         results.put((f'{artist} {song}', price))
-#         songsQueue.task_done()
-
-
-
-
-# Search for songs using multithreading
-# start = time.perf_counter()
-
-# results = queue.Queue()
-# for i in range(4):
-#     t = threading.Thread(target=search_songs, args=(songsQueue, results))
-#     t.start()
-
-# songsQueue.join()
-
-# end = time.perf_counter()
-
-# while not results.empty():
-#     song, price = results.get()
-#     print(f'{song} cost {price}')
-
-# print(end - start)
-

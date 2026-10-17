@@ -1,5 +1,6 @@
 import requests
 from urllib.parse import quote
+from .matching import match_rank
 
 class ItuneSearch:
     def __init__(self):
@@ -14,19 +15,21 @@ class ItuneSearch:
             response.raise_for_status()
             jsResponse = response.json()
 
-            results = jsResponse.get('results', [])
-            for result in results:
-                if result['kind'] == 'song':
-                    track_url = result['trackViewUrl']
-                    if 'music.apple.com' in track_url:
-                        track_url = track_url.replace('music.apple.com', 'geo.itunes.apple.com')
-                        track_url += '?ls=1&app=itunes'
-                        # print(f'Track URL: {track_url}')
-                        
-                    return {
-                        'price': result.get('trackPrice', -1),
-                        'url': track_url
-                    }
+            matches = []
+            for result in jsResponse.get('results', []):
+                if result.get('kind') != 'song':
+                    continue
+                rank = match_rank(artistName, trackName,
+                                  result.get('artistName', ''), result.get('trackName', ''))
+                if rank is not None and result.get('trackViewUrl'):
+                    matches.append((rank, result))
+            if matches:
+                result = min(matches, key=lambda item: item[0])[1]
+                track_url = result['trackViewUrl']
+                if 'music.apple.com' in track_url:
+                    track_url = track_url.replace('music.apple.com', 'geo.itunes.apple.com')
+                    track_url += '?ls=1&app=itunes'
+                return {'price': result.get('trackPrice', -1), 'url': track_url}
 
         except requests.exceptions.RequestException as e:
             print(f'iTunes lookup failed: {type(e).__name__}')

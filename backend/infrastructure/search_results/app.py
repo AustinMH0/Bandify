@@ -108,31 +108,22 @@ def route(event, path, method, request_headers):
         if not tracks:
             return respond(400, {"error": "No tracks provided"})
 
-        song_names = [t['name'] for t in tracks]
-        artists = [t['artist'] for t in tracks]
-
         with Session(get_engine()) as session:
-            db_dict = get_existing_tracks(session, song_names, artists)
-
             final_data = []
             new_data = []
 
             for track in tracks:
-                key = (track['name'], track['artist'])
-                song_data = db_dict.get(key)
-                if not song_data:
-                    song_data = get_api_prices(track['artist'], track['name'])
-
-                    song_data['track_name'] = track['name']
-                    song_data['artist'] = track['artist']
-                    # Transport/browser failures are retryable, not a permanent
-                    # "not found" cache entry. Return any successful store prices.
-                    if not song_data.get('errors'):
-                        new_data.append({k: v for k, v in song_data.items() if k != 'errors'})
-                else:
-                    song_data['track_name'] = track['name']
-                    song_data['artist'] = track['artist']
-                
+                # Stored rows have only the REQUESTED identity, not the artist
+                # returned by each store or a matcher version. They cannot prove
+                # that any cached price passed validation. Recheck on lookup
+                # until the schema can record per-store validation provenance.
+                song_data = get_api_prices(track['artist'], track['name'])
+                song_data['track_name'] = track['name']
+                song_data['artist'] = track['artist']
+                # Transport/browser failures are retryable; return partial fresh
+                # results without overwriting stored data or falling back to it.
+                if not song_data.get('errors'):
+                    new_data.append({k: v for k, v in song_data.items() if k != 'errors'})
                 final_data.append(song_data)
 
 

@@ -17,3 +17,16 @@ Settings the deploy workflow needs as GitHub Actions secrets:
 The redirect URI registered in the Spotify developer dashboard must be exactly `<API>/callback` (the `SpotifyRedirectUri` output of `searchresults-stack`).
 
 Backend tests: `pip install -r backend/infrastructure/search_results/requirements.txt pytest`, then `pytest backend/infrastructure/tests/unit`.
+
+Price-search UI checks: `cd frontend && npm ci && npx playwright install chromium`,
+then `npm run test:e2e`. These headless tests use fake Spotify/store responses and
+need no credentials. `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` can select an existing
+Chromium, and `PLAYWRIGHT_OUTPUT_DIR` can redirect test artifacts (default: `/tmp/bandify-playwright-results`).
+
+Store matching requires matching artist credits and an exact normalized title
+(or the store's `Original Mix` suffix). Unrequested cover/remix/karaoke/tribute/
+instrumental versions return N/A. Historical database rows record the requested
+artist, not the matched store artist, so price lookups currently recheck stores
+and refresh successful rows in place. Persistent cache reuse needs a future schema
+migration recording per-store matched identity, matcher version, and expiry;
+existing rows must not be labeled as validated without being rechecked.

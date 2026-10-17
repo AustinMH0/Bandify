@@ -168,7 +168,7 @@ const PlaylistTable = ({
         try {
           const response = await axios.post<SongPrice[]>(`${baseURL}/db_results`, {
             tracks: [track],
-          });
+          }, { timeout: 35000 });
           const item = response.data.find(
             (item) => item.track_name === track.name && item.artist === track.artist
           );
@@ -300,7 +300,12 @@ const PlaylistTable = ({
             }}
           >
             <div style={{ flex: 1, overflowY: "auto", paddingBottom: "60px" }}>
-              {fetchingPrices && <Text role="status">Looking up prices: {priceProgress}/{selectedPlaylist ? tracks[selectedPlaylist]?.length : 0}</Text>}
+              {fetchingPrices && (
+                <div role="status" aria-live="polite">
+                  <div aria-hidden="true"><LoadingRipple /></div>
+                  <Text ta="center">Looking up prices: {priceProgress}/{selectedPlaylist ? tracks[selectedPlaylist]?.length : 0}</Text>
+                </div>
+              )}
               {priceError && <Alert color="red" role="alert">{priceError}</Alert>}
               {loading ? (
                 <LoadingRipple />
