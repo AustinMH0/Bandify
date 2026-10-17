@@ -54,5 +54,12 @@ def get_existing_tracks(session: Session, names=None, artists=None):
         return [dict(row._mapping) for row in rows]
 
 def insert_tracks(session: Session, track_data):
-    session.execute(track_table.insert(), track_data)
+    # Refresh in place, including pre-validation rows. Never accumulate stale
+    # duplicates or keep a wrong price when a new search returns not found.
+    for data in track_data:
+        condition = and_(track_table.c.track_name == data["track_name"],
+                         track_table.c.artist == data["artist"])
+        updated = session.execute(track_table.update().where(condition).values(**data))
+        if not updated.rowcount:
+            session.execute(track_table.insert(), data)
     session.commit()

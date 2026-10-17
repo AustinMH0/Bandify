@@ -363,7 +363,7 @@ def track_db(app):
     return engine
 
 
-def test_price_lookup_stores_new_tracks_and_reuses_them(app, track_db, monkeypatch):
+def test_price_lookup_revalidates_stored_tracks_without_duplicates(app, track_db, monkeypatch):
     import datetime
 
     searched = []
@@ -384,7 +384,7 @@ def test_price_lookup_stores_new_tracks_and_reuses_them(app, track_db, monkeypat
     second = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
 
     assert first["statusCode"] == 200 and second["statusCode"] == 200
-    assert searched == [("X", "Song A")]
+    assert searched == [("X", "Song A"), ("X", "Song A")]
     stored = json.loads(second["body"])[0]
     assert (stored["track_name"], stored["artist"]) == ("Song A", "X")
     assert stored["itunes_price"] == 1.29
@@ -423,11 +423,11 @@ def test_new_track_crosses_scraper_http_boundary_and_is_committed(app, track_db,
     assert (row["itunes_price"], row["bandcamp_price"], row["beatport_price"]) == (1.29, 0.99, 1.49)
     assert row["errors"] == []
 
-    # A fresh session reads the committed row; cached tracks bypass the stores.
+    # A fresh lookup revalidates the committed row; stored identity is unverified.
     second = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
     assert second["statusCode"] == 200
     assert json.loads(second["body"])[0]["bandcamp_price"] == 0.99
-    assert calls == [{"artist": "X", "track_name": "New Song"}]
+    assert calls == [{"artist": "X", "track_name": "New Song"}] * 2
 
 
 def test_transport_failure_returns_partial_prices_without_poisoning_cache(app, track_db, monkeypatch):
@@ -457,3 +457,46 @@ def test_transport_failure_returns_partial_prices_without_poisoning_cache(app, t
 
 def test_unknown_route_is_404(app):
     assert app.lambda_handler(make_event("GET", "/nope"), None)["statusCode"] == 404
+
+
+@pytest.mark.parametrize("errors", [[], ["bandcamp"]])
+def test_legacy_wrong_prices_are_rechecked_and_never_used_as_fallback(app, track_db, monkeypatch, errors):
+    import datetime
+    from sqlalchemy import MetaData, Table
+
+    # The legacy row says The Weeknd because it copied the request, although its
+    # Bandcamp URL/price actually came from vayd's cover. No stored field proves
+    # a matched store identity, even for rows written during a rolling release.
+    table = Table("track", MetaData(), autoload_with=track_db)
+    with track_db.begin() as connection:
+        connection.execute(table.insert().values(
+            track_name="Blinding Lights", artist="The Weeknd",
+            bandcamp_price=0, bandcamp_url="https://vayd.bandcamp.com/track/blinding-lights",
+            created_at=datetime.datetime(2026, 10, 17),
+        ))
+    calls = []
+
+    def prices(artist, name):
+        calls.append((artist, name))
+        return {
+            "itunes_price": 1.29, "itunes_url": "https://itunes.example/original",
+            "beatport_price": 1.49, "beatport_url": "https://beatport.example/original",
+            "bandcamp_price": -1, "bandcamp_url": "", "errors": errors,
+            "created_at": datetime.datetime(2026, 10, 18),
+        }
+
+    monkeypatch.setattr(app, "get_api_prices", prices)
+    body = json.dumps({"tracks": [{"name": "Blinding Lights", "artist": "The Weeknd"}]})
+    result = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    assert result["statusCode"] == 200
+    row = json.loads(result["body"])[0]
+    assert calls == [("The Weeknd", "Blinding Lights")]
+    assert row["bandcamp_price"] == -1
+    assert row["bandcamp_url"] == ""
+    assert row["itunes_price"] == 1.29
+    with track_db.connect() as connection:
+        stored = connection.execute(table.select()).mappings().all()
+    assert len(stored) == 1
+    # A failed provider does not overwrite stored data, which is never trusted
+    # on POST; successful N/A replaces the stale cover in the historical row.
+    assert stored[0]["bandcamp_price"] == (0 if errors else -1)
