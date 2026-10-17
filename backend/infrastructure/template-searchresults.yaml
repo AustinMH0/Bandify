@@ -33,6 +33,32 @@ Parameters:
     Default: https://groovonomy.com
     Description: Origin of the front end; users return here after signing in
 
+  # Existing network of the bandify-db-lite database; looked up, not created here
+  DatabaseVpcId:
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-00cd1b243fc013613
+    Description: VPC of the Postgres database
+
+  NatPublicSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Default: subnet-085d8ce371ba980f2
+    Description: Existing public subnet (routed to the internet gateway) that holds the NAT gateway
+
+  DatabaseSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Default: sg-0f9b7c302a164f578
+    Description: Security group of the Postgres database; gains one rule admitting this function
+
+  PrivateSubnetACidr:
+    Type: String
+    Default: 172.31.128.0/20
+    Description: Unused CIDR block in the database VPC for the first private subnet
+
+  PrivateSubnetBCidr:
+    Type: String
+    Default: 172.31.144.0/20
+    Description: Unused CIDR block in the database VPC for the second private subnet
+
 Globals:
   Function:
     Timeout: 3
@@ -73,9 +99,117 @@ Resources:
                 Resource:
                   - !Sub arn:aws:s3:::${S3BucketName}
                   - !Sub arn:aws:s3:::${S3BucketName}/*
+              # Lets Lambda create and remove the function's network interfaces in the VPC
+              # (same actions as AWSLambdaVPCAccessExecutionRole, kept inline like the rest)
+              - Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DescribeSubnets
+                  - ec2:DeleteNetworkInterface
+                  - ec2:AssignPrivateIpAddresses
+                  - ec2:UnassignPrivateIpAddresses
+                Resource: "*"
+
+  # Private subnets for the function: it reaches the database over the VPC and
+  # everything else (Spotify, the Playwright API, price sites) through the NAT gateway
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DatabaseVpcId
+      CidrBlock: !Ref PrivateSubnetACidr
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: searchresults-private-a
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DatabaseVpcId
+      CidrBlock: !Ref PrivateSubnetBCidr
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: searchresults-private-b
+
+  NatGatewayIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: searchresults-nat
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayIp.AllocationId
+      SubnetId: !Ref NatPublicSubnetId
+      Tags:
+        - Key: Name
+          Value: searchresults-nat
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref DatabaseVpcId
+      Tags:
+        - Key: Name
+          Value: searchresults-private
+
+  PrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnetARouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnetBRouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+
+  SearchResultsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Search results Lambda; outbound only
+      VpcId: !Ref DatabaseVpcId
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: searchresults-lambda
+
+  # The database keeps its existing rules; this adds the function as a client
+  DatabaseIngressFromSearchResults:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !Ref SearchResultsSecurityGroup
+      Description: Postgres from the search results Lambda
 
   SearchResultsFunction:
     Type: AWS::Serverless::Function
+    # Attach only once outbound internet and database access are in place
+    DependsOn:
+      - PrivateDefaultRoute
+      - PrivateSubnetARouteTable
+      - PrivateSubnetBRouteTable
+      - DatabaseIngressFromSearchResults
     Properties:
       CodeUri: search_results/
       Handler: app.lambda_handler
@@ -84,6 +218,12 @@ Resources:
       Timeout: 28
       MemorySize: 512
       Role: !GetAtt SearchResultsExecutionRole.Arn
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref SearchResultsSecurityGroup
+        SubnetIds:
+          - !Ref PrivateSubnetA
+          - !Ref PrivateSubnetB
       Events:
         # /login, /callback, /get_playlists, /get_tracks/{id}, /db_results and CORS preflight
         ApiEndpoint:
