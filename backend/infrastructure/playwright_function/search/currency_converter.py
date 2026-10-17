@@ -27,7 +27,7 @@ class CurrencyConverter:
 
         try:
             url = f'https://hexarate.paikama.co/api/rates/latest/{currency}?target=USD'
-            response = requests.get(url, timeout=5)
+            response = requests.get(url, timeout=(1, 2))
             if response.status_code == 200:
                 data = response.json()
                 rate = data.get('data', {}).get('mid')
@@ -38,4 +38,4 @@ class CurrencyConverter:
         except Exception as e:
             print(f'[CurrencyConverter] Error: {e}')
 
-        return -1
+        raise RuntimeError('Currency conversion unavailable')

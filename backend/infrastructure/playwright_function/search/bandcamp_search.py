@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 from urllib.parse import quote
-from playwright.sync_api import sync_playwright
+from time import monotonic
+from .browser import page_html
 import re
 from .currency_converter import CurrencyConverter
 
@@ -8,22 +9,12 @@ class BandcampSearch:
     def __init__(self):
         pass
         
-    def get_page_html(self, url: str) -> str:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto(url, timeout=0)
-            page.wait_for_timeout(500)
-            html = page.content()
-            browser.close()
-        return html
-
-
     def search_song(self, track_name: str, artist_name: str) -> dict:
+        deadline = monotonic() + 9
         query = f'{track_name} {artist_name}'
         search_url = f'https://bandcamp.com/search?q={quote(query)}&item_type=t'
 
-        html = self.get_page_html(search_url)
+        html = page_html(search_url, deadline)
         soup = BeautifulSoup(html, 'html.parser')
 
         result_row = soup.find('li', class_=lambda c: c and 'searchresult' in c)
@@ -37,7 +28,7 @@ class BandcampSearch:
                 track_url = anchor['href']
                 # print(f'Track URL for {track_name}: {track_url}')
 
-                track_html = self.get_page_html(track_url)
+                track_html = page_html(track_url, deadline)
                 track_soup = BeautifulSoup(track_html, 'html.parser')
 
                 nyp_span = track_soup.find('span', string=lambda text: text and 'name your price' in text.lower())
@@ -46,7 +37,7 @@ class BandcampSearch:
 
                 else:
                     buy_item = track_soup.select_one('li.buyItem:has(h4:contains("Buy Digital Track"))')
-                    if buy_item:
+                    if buy_item and buy_item.select_one('span.base-text-color'):
                         price_span = buy_item.select_one('span.base-text-color')
 
                         price_text = price_span.get_text(strip=True)
@@ -69,16 +60,10 @@ class BandcampSearch:
                             currency_code = currency_map.get(symbol)
                             #print(f"Detected symbol: '{symbol}' | Code: {currency_code} | Amount: {amount}")
 
-                            try:
-                                if currency_code and currency_code != 'USD':
-                                    usd_price = CurrencyConverter.convert_to_usd(currency_code, amount)
-                                    #print(f'Converted {amount} {currency_code} to {usd_price} USD')
-                                    price = usd_price
-                                else:
-                                    price = round(amount, 2)
-                            except Exception as e:
-                                #print(f'Currency conversion error: {e}')
-                                price = -1
+                            if currency_code and currency_code != 'USD':
+                                price = CurrencyConverter.convert_to_usd(currency_code, amount)
+                            else:
+                                price = round(amount, 2)
 
         return {'price': price, 'url': track_url}
 

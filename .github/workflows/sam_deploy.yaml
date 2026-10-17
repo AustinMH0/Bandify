@@ -29,12 +29,7 @@ jobs:
         with:
           version: 1.8.2
       
-      # Export dependencies for Playwright Lambda Function
-
-      - name: Export Playwright dependencies
-        run: |
-          poetry export -f requirements.txt --without-hashes --with playwright -o playwright_function/requirements.txt
-        working-directory: backend/infrastructure
+      # The Playwright image has its own minimal, pinned requirements.txt.
 
       # Export dependencies for SearchResults Lambda Function
 
@@ -61,6 +56,12 @@ jobs:
       - name: Build Playwright stack
         run: sam build --template-file template-playwright.yaml --build-dir .aws-sam/playwright --use-container
 
+      - name: Verify Chromium can launch with a read-only filesystem
+        run: |
+          docker run --rm --read-only --user 1000:1000 --tmpfs /tmp --entrypoint python \
+            playwrightfunction:browser-v1 -c \
+            'from playwright.sync_api import sync_playwright; p = sync_playwright().start(); b = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage", "--single-process"]); print(b.version); b.close(); p.stop()'
+
       - name: Build SearchResults stack
         run: sam build --template-file template-searchresults.yaml --build-dir .aws-sam/search_results --use-container
 
@@ -69,6 +70,7 @@ jobs:
 
       - name: Deploy Playwright Stack
         env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
@@ -79,6 +81,7 @@ jobs:
             --capabilities CAPABILITY_IAM \
             --s3-bucket $AWS_S3_BUCKET \
             --s3-prefix sam-artifacts/playwright \
+            --image-repositories PlaywrightFunction=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/bandify-playwright \
             --parameter-overrides S3BucketName=$AWS_S3_BUCKET \
             --no-confirm-changeset
 

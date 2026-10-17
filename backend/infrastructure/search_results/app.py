@@ -125,7 +125,10 @@ def route(event, path, method, request_headers):
 
                     song_data['track_name'] = track['name']
                     song_data['artist'] = track['artist']
-                    new_data.append(song_data)
+                    # Transport/browser failures are retryable, not a permanent
+                    # "not found" cache entry. Return any successful store prices.
+                    if not song_data.get('errors'):
+                        new_data.append({k: v for k, v in song_data.items() if k != 'errors'})
                 else:
                     song_data['track_name'] = track['name']
                     song_data['artist'] = track['artist']

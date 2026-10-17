@@ -56,13 +56,9 @@ Resources:
   PlaywrightFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: playwright_function/
-      Handler: app.lambda_handler
-      Runtime: python3.11
-      Timeout: 30
+      PackageType: Image
+      Timeout: 20
       MemorySize: 1024
-      Layers:
-        - !Ref PythonRequirementsLayer
       Role: !GetAtt PlaywrightExecutionRole.Arn
       Events:
         apiPlaywright:
@@ -71,19 +67,10 @@ Resources:
             RestApiId: !Ref MyApi
             Path: /playwright_function
             Method: post
-    # Metadata:
-    #   BuildMethod: python3.11
-    #   BuildProperties:
-    #     Requirements: playwright_function/requirements.txt
-  
-  PythonRequirementsLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties: 
-      LayerName: python-deps
-      ContentUri: playwright_function/
-      CompatibleRuntimes: 
-        - python3.11
-      RetentionPolicy: Delete
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: playwright_function/
+      DockerTag: browser-v1
 
 Outputs:
   PlaywrightApiUrl:
