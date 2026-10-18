@@ -4,7 +4,7 @@
 
 # Spotify sign-in
 
-"Login with Spotify" sends the browser to `<API>/login`, which redirects to Spotify. Spotify returns to `<API>/callback`, and the API sends the user back to the front end with an encrypted session in the URL fragment. The front end keeps it in `sessionStorage` and sends it as `Authorization: Bearer <session>` to `/get_playlists` and `/get_tracks/<playlist id>`.
+"Login with Spotify" sends the browser to `<API>/login`, which redirects to Spotify. Spotify returns to `<API>/callback`, and the API sends the user back to the front end with an encrypted session in the URL fragment. The front end keeps it in `sessionStorage` and sends it as `Authorization: Bearer <session>` to `/get_playlists`, `/get_tracks/<playlist id>` and `/db_results` (GET and POST).
 
 Settings the deploy workflow needs as GitHub Actions secrets:
 
@@ -46,3 +46,38 @@ backfilled as validated: legacy rows and older scraper responses are rechecked.
 PostgreSQL timestamps use UTC with time zone. Bump `MATCHER_VERSION` in both
 identical `search/matching.py` copies when matching rules or provider identity
 extraction change. No frontend migration is needed.
+
+Foundation request controls: POST `/db_results` accepts exactly one track with
+nonempty `name` and `artist` strings (at most 300 characters each, no control
+characters) and a JSON body of at most 4 KiB. Price authentication validates the
+existing seven-day encrypted session locally; it does not refresh Spotify.
+Playlist discovery is shared across the page, including React StrictMode mounts.
+Spotify item requests use 50-item pages and follow every `next` cursor. Access
+errors (403/404) are returned without probing the deprecated tracks endpoint;
+Spotify 429 responses preserve `Retry-After`.
+
+Store cache misses share a single database-backed admission slot across all
+SearchResults instances, with at least six seconds between admissions (at most
+ten iTunes searches per minute). Cache hits bypass admission. A busy slot returns
+429 with `Retry-After`; the existing UI keeps its ripple while retrying the same
+track up to twice, then uses its existing retry message. This can make searches
+wait longer under load. No automatic prefetch or background jobs run.
+
+The first cache miss creates the singleton `price_search_admission` table in the
+existing database; the runtime role needs `CREATE TABLE` and read/write access to
+that table. An operator can instead provision it ahead of rollout using the DDL
+in `search_results/admission.py`. Leases expire after 60 seconds (longer than the combined
+28+20-second coordinator/scraper deadlines), survive Lambda termination, and
+cannot be released by a previous owner. Ambiguous scraper transport failures
+retain the lease because the remote Lambda may still be running. Database
+transactions are closed during external searches. Admission fails closed when
+the database is unavailable.
+
+The scraper requires short-lived, payload-bound internal signatures from the
+admitted coordinator; public browser sessions cannot bypass admission by calling
+it directly. Both stacks use the existing `SESSION_SECRET`; the deployment
+workflow passes it to the scraper as well. Release the scraper before
+SearchResults. An older coordinator will see scraper authentication failures
+during that rollout window and can retry afterward. No secret rotation or new
+AWS resources are needed. Keep both Lambda timeouts below the admission lease
+when changing deployment settings.

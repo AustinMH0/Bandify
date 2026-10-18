@@ -39,6 +39,11 @@ def make_event(method, path, headers=None, query=None, body=None):
     }
 
 
+def price_event(app, method, path, **kwargs):
+    token = app.spotify_auth.create_session({"access_token": "test-access"})
+    return make_event(method, path, headers={"Authorization": f"Bearer {token}"}, **kwargs)
+
+
 def load_modules():
     """Imports the handler the way a new Lambda instance would."""
     for name in ("app", "db", "spotify_auth", "search_tracks", "price_cache"):
@@ -56,6 +61,10 @@ def app(monkeypatch, tmp_path):
     monkeypatch.delenv("SPOTIFY_REDIRECT_URI", raising=False)
     monkeypatch.delenv("PLAYWRIGHT_API_URL", raising=False)
     monkeypatch.delenv("PRICE_CACHE_TTL_SECONDS", raising=False)
+    # Cache/provider regression tests run without a real-time cooldown. Shared
+    # admission behavior is exercised with real defaults in test_admission.py.
+    import admission
+    monkeypatch.setattr(admission, "SEARCH_INTERVAL", 0)
     return load_modules()
 
 
@@ -104,7 +113,7 @@ def test_unreachable_database_returns_json_error_quickly(app, monkeypatch):
     monkeypatch.setenv("DB_URL", "postgresql+psycopg2://user:pw@127.0.0.1:1/db")
     app = load_modules()
     started = time.time()
-    response = app.lambda_handler(make_event("GET", "/db_results"), None)
+    response = app.lambda_handler(price_event(app, "GET", "/db_results"), None)
 
     assert time.time() - started < 10
     assert response["statusCode"] == 503
@@ -276,7 +285,7 @@ def test_get_tracks_follows_pages_and_both_item_shapes(app, monkeypatch):
     import spotify_auth
 
     session = sign_in(app, monkeypatch)
-    second_page = "https://api.spotify.com/v1/playlists/p1/items?offset=100"
+    second_page = "https://api.spotify.com/v1/playlists/p1/items?offset=50"
 
     def fake_get(url, params=None, headers=None, timeout=None):
         if url == second_page:
@@ -285,6 +294,7 @@ def test_get_tracks_follows_pages_and_both_item_shapes(app, monkeypatch):
                 "next": None,
             })
         assert url == "https://api.spotify.com/v1/playlists/p1/items"
+        assert params == {"limit": 50}
         return FakeResponse({
             "items": [
                 {"item": {"name": "Song A", "artists": [{"name": "X"}, {"name": "Y"}]}},
@@ -306,22 +316,21 @@ def test_get_tracks_follows_pages_and_both_item_shapes(app, monkeypatch):
     ]
 
 
-def test_get_tracks_falls_back_to_older_endpoint(app, monkeypatch):
+@pytest.mark.parametrize("status", [403, 404])
+def test_get_tracks_preserves_access_errors_without_legacy_retry(app, monkeypatch, status):
     import spotify_auth
-
     session = sign_in(app, monkeypatch)
+    calls = []
 
-    def fake_get(url, params=None, headers=None, timeout=None):
-        if url.endswith("/items"):
-            return FakeResponse({}, status_code=404)
-        assert url == "https://api.spotify.com/v1/playlists/p1/tracks"
-        return FakeResponse({"items": [{"track": {"name": "Song A", "artists": [{"name": "X"}]}}], "next": None})
+    def fake_get(url, **kwargs):
+        calls.append(url)
+        return FakeResponse({}, status_code=status)
 
     monkeypatch.setattr(spotify_auth.requests, "get", fake_get)
     response = app.lambda_handler(
-        make_event("GET", "/get_tracks/p1", headers={"Authorization": f"Bearer {session}"}), None
-    )
-    assert json.loads(response["body"]) == [{"name": "Song A", "artist": "X"}]
+        make_event("GET", "/get_tracks/p1", headers={"Authorization": f"Bearer {session}"}), None)
+    assert response["statusCode"] == status
+    assert calls == ["https://api.spotify.com/v1/playlists/p1/items"]
 
 
 def test_get_tracks_rejects_odd_playlist_ids(app, monkeypatch):
@@ -336,7 +345,7 @@ def test_get_tracks_rejects_odd_playlist_ids(app, monkeypatch):
     response = app.lambda_handler(
         make_event("GET", "/get_tracks/..%2Fme", headers={"Authorization": f"Bearer {session}"}), None
     )
-    assert response["statusCode"] == 502
+    assert response["statusCode"] == 400
 
 
 def test_preflight_allows_the_front_end(app):
@@ -406,11 +415,11 @@ def test_price_lookup_reuses_validated_tracks_without_duplicates(app, track_db, 
     monkeypatch.setattr(app, "get_api_prices", fake_prices)
     body = json.dumps({"tracks": [{"name": "Song A", "artist": "X"}]})
 
-    first = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    first = app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     # Reuse must survive a Lambda cold start, not just a warm process.
     app = load_modules()
     monkeypatch.setattr(app, "get_api_prices", fake_prices)
-    second = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    second = app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
 
     assert first["statusCode"] == 200 and second["statusCode"] == 200
     assert searched == [("X", "Song A")]
@@ -419,12 +428,12 @@ def test_price_lookup_reuses_validated_tracks_without_duplicates(app, track_db, 
     assert stored["itunes_price"] == 1.29
     assert stored["beatport_url"] == "https://beatport.example/a"
 
-    everything = app.lambda_handler(make_event("GET", "/db_results"), None)
+    everything = app.lambda_handler(price_event(app, "GET", "/db_results"), None)
     assert len(json.loads(everything["body"])) == 1
 
 
 def test_price_lookup_requires_tracks(app):
-    response = app.lambda_handler(make_event("POST", "/db_results", body=json.dumps({"tracks": []})), None)
+    response = app.lambda_handler(price_event(app, "POST", "/db_results", body=json.dumps({"tracks": []})), None)
     assert response["statusCode"] == 400
 
 
@@ -442,13 +451,13 @@ def test_price_response_includes_each_stores_utc_validation_time(app, track_db, 
 
     monkeypatch.setattr(app, "get_api_prices", fake_prices)
     body = json.dumps({"tracks": [{"name": "Song", "artist": "Artist"}]})
-    first = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    first = app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
 
     def unexpected_search(*args, **kwargs):
         pytest.fail("Validated prices should be reused")
 
     monkeypatch.setattr(app, "get_api_prices", unexpected_search)
-    cached = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    cached = app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     for response in (first, cached):
         assert response["statusCode"] == 200
         row = json.loads(response["body"])[0]
@@ -466,25 +475,25 @@ def test_new_track_crosses_scraper_http_boundary_and_is_committed(app, track_db,
     monkeypatch.setattr(search_tracks, "PLAYWRIGHT_API_URL", "https://scraper.example/playwright_function")
     monkeypatch.setattr(search_tracks.ItuneSearch, "search_song", lambda *args: store_result(1.29, "https://itunes.example/a", "X", "New Song"))
 
-    def proxy_post(url, json, timeout):
+    def proxy_post(url, json, timeout, headers):
         import json as json_module
 
         assert url == search_tracks.PLAYWRIGHT_API_URL
         assert timeout == (2, 16)
         calls.append(json)
-        result = scraper.lambda_handler({"body": json_module.dumps(json), "httpMethod": "POST"}, None)
+        result = scraper.lambda_handler({"body": json_module.dumps(json), "httpMethod": "POST", "headers": headers}, None)
         return FakeResponse(json_module.loads(result["body"]), result["statusCode"])
 
     monkeypatch.setattr(search_tracks.requests, "post", proxy_post)
     body = json.dumps({"tracks": [{"name": "New Song", "artist": "X"}]})
-    first = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    first = app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     assert first["statusCode"] == 200
     row = json.loads(first["body"])[0]
     assert (row["itunes_price"], row["bandcamp_price"], row["beatport_price"]) == (1.29, 0.99, 1.49)
     assert row["errors"] == []
 
     # A fresh lookup uses persisted provider provenance without store traffic.
-    second = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    second = app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     assert second["statusCode"] == 200
     assert json.loads(second["body"])[0]["bandcamp_price"] == 0.99
     assert calls == [{"artist": "X", "track_name": "New Song", "stores": ["bandcamp", "beatport"]}]
@@ -505,8 +514,14 @@ def test_transport_failure_returns_partial_prices_without_poisoning_cache(app, t
 
     monkeypatch.setattr(search_tracks.requests, "post", unavailable)
     body = json.dumps({"tracks": [{"name": "New Song", "artist": "X"}]})
-    for _ in range(2):
-        response = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    for attempt in range(2):
+        if attempt:
+            # A read timeout can leave the scraper running. Retry only after
+            # its shared lease has expired (simulate time without sleeping).
+            from sqlalchemy import text
+            with track_db.begin() as connection:
+                connection.execute(text("UPDATE price_search_admission SET lease_until = 0, next_allowed = 0"))
+        response = app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
         assert response["statusCode"] == 200
         row = json.loads(response["body"])[0]
         assert row["itunes_price"] == 0.99
@@ -515,7 +530,7 @@ def test_transport_failure_returns_partial_prices_without_poisoning_cache(app, t
         assert row["bandcamp_validated_at"] is None
         assert row["beatport_validated_at"] is None
     assert len(calls) == 2
-    stored = app.lambda_handler(make_event("GET", "/db_results"), None)
+    stored = app.lambda_handler(price_event(app, "GET", "/db_results"), None)
     saved = json.loads(stored["body"])
     assert len(saved) == 1
     assert saved[0]["itunes_price"] == 0.99
@@ -557,7 +572,7 @@ def test_legacy_wrong_prices_are_rechecked_and_never_used_as_fallback(app, track
 
     monkeypatch.setattr(app, "get_api_prices", prices)
     body = json.dumps({"tracks": [{"name": "Blinding Lights", "artist": "The Weeknd"}]})
-    result = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    result = app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     assert result["statusCode"] == 200
     row = json.loads(result["body"])[0]
     assert calls == [("The Weeknd", "Blinding Lights")]
@@ -590,7 +605,7 @@ def test_only_invalid_store_is_rechecked(app, track_db, monkeypatch, store, inva
 
     monkeypatch.setattr(app, "get_api_prices", prices)
     body = json.dumps({"tracks": [{"name": "Song A", "artist": "X"}]})
-    app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     table = Table("track", MetaData(), autoload_with=track_db)
     invalid_fields = {
         "expired": {f"{store}_validated_at": utcnow() - datetime.timedelta(days=8)},
@@ -602,7 +617,7 @@ def test_only_invalid_store_is_rechecked(app, track_db, monkeypatch, store, inva
     with track_db.begin() as connection:
         connection.execute(table.update().values(**invalid_fields[invalid]))
         before = dict(connection.execute(table.select()).mappings().one())
-    response = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    response = app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     assert response["statusCode"] == 200
     assert calls == [["itunes", "bandcamp", "beatport"], [store]]
     assert json.loads(response["body"])[0]["errors"] == []
@@ -612,7 +627,7 @@ def test_only_invalid_store_is_rechecked(app, track_db, monkeypatch, store, inva
         if other != store:
             assert before[f"{other}_validated_at"] == after[f"{other}_validated_at"]
     # Revalidated matches and no-match results are reusable immediately.
-    app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     assert len(calls) == 2
 
 
@@ -640,17 +655,17 @@ def test_freshness_window_setting_and_expiry_boundary(app, track_db, monkeypatch
         return result
 
     monkeypatch.setattr(app, "get_api_prices", pinned_prices)
-    app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     table = Table("track", MetaData(), autoload_with=track_db)
     with track_db.begin() as connection:
         connection.execute(table.update().values(
             itunes_validated_at=now - datetime.timedelta(seconds=60),
             beatport_validated_at=now - datetime.timedelta(seconds=59),
         ))
-    app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     assert calls[-1] == ["itunes"]
     monkeypatch.setenv("PRICE_CACHE_TTL_SECONDS", "0")
-    app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     assert calls[-1] == ["itunes", "bandcamp", "beatport"]
 
 
@@ -678,22 +693,22 @@ def test_partial_store_failure_saves_successes_and_retries_only_failure(app, tra
 
     monkeypatch.setattr(scraper.BandcampSearch, "search_song", bandcamp)
 
-    def proxy_post(url, json, timeout):
+    def proxy_post(url, json, timeout, headers):
         import json as json_module
 
         calls.append(json["stores"])
-        response = scraper.lambda_handler({"body": json_module.dumps(json)}, None)
+        response = scraper.lambda_handler({"body": json_module.dumps(json), "headers": headers}, None)
         return FakeResponse(json_module.loads(response["body"]), response["statusCode"])
 
     monkeypatch.setattr(search_tracks.requests, "post", proxy_post)
     body = json.dumps({"tracks": [{"name": "Song A", "artist": "X"}]})
-    app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     table = Table("track", MetaData(), autoload_with=track_db)
     stale = datetime.datetime(2020, 1, 1)
     with track_db.begin() as connection:
         connection.execute(table.update().values(bandcamp_validated_at=stale, beatport_validated_at=stale))
     fail = True
-    response = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    response = app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     row = json.loads(response["body"])[0]
     assert row["errors"] == ["bandcamp"]
     assert (row["itunes_price"], row["beatport_price"], row["bandcamp_price"]) == (1.29, 1.49, -1)
@@ -708,8 +723,8 @@ def test_partial_store_failure_saves_successes_and_retries_only_failure(app, tra
     assert saved["beatport_validated_at"] > stale
     # Recovery only queries the failing store, then all stores are cache hits.
     fail = False
-    app.lambda_handler(make_event("POST", "/db_results", body=body), None)
-    app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
+    app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     assert calls == [["bandcamp", "beatport"], ["bandcamp", "beatport"], ["bandcamp"]]
     assert itunes_calls == [("X", "Song A")]
 
@@ -742,20 +757,137 @@ def test_old_scraper_cannot_certify_current_cache(app, track_db, monkeypatch):
     monkeypatch.setattr(search_tracks.ItuneSearch, "search_song", lambda *args: store_result())
     calls = []
 
-    def old_scraper(url, json, timeout):
+    def old_scraper(url, json, timeout, headers):
         calls.append(json["stores"])
         return FakeResponse({store: {"price": -1, "url": ""} for store in json["stores"]})
 
     monkeypatch.setattr(search_tracks.requests, "post", old_scraper)
     body = json.dumps({"tracks": [{"name": "Song A", "artist": "X"}]})
     for _ in range(2):
-        response = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+        response = app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
         assert response["statusCode"] == 200
         row = json.loads(response["body"])[0]
         assert row["bandcamp_validated_at"] is None
         assert row["beatport_validated_at"] is None
-    saved = json.loads(app.lambda_handler(make_event("GET", "/db_results"), None)["body"])[0]
+    saved = json.loads(app.lambda_handler(price_event(app, "GET", "/db_results"), None)["body"])[0]
     assert saved["itunes_validated_at"]
     assert saved["bandcamp_validated_at"] is None
     assert saved["beatport_validated_at"] is None
     assert calls == [["bandcamp", "beatport"], ["bandcamp", "beatport"]]
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+@pytest.mark.parametrize("credential", [None, "Basic test", "Bearer forged"])
+def test_price_routes_reject_unauthenticated_before_db_or_stores(app, monkeypatch, method, credential):
+    def unexpected(*args, **kwargs):
+        pytest.fail("Unauthenticated callers must not reach database or stores")
+    monkeypatch.setattr(app, "get_engine", unexpected)
+    monkeypatch.setattr(app, "get_api_prices", unexpected)
+    response = app.lambda_handler(make_event(method, "/db_results",
+        headers={"Authorization": credential} if credential else {},
+        body=json.dumps({"tracks": [{"name": "Song", "artist": "Artist"}]})), None)
+    assert response["statusCode"] == 401
+
+
+def test_price_session_expiry_is_enforced_without_spotify_refresh(app, monkeypatch):
+    token = app.spotify_auth.create_session({"access_token": "expired-spotify", "expires_in": -1})
+    def no_spotify(*args, **kwargs):
+        pytest.fail("Price authentication must not contact Spotify")
+    monkeypatch.setattr(app.spotify_auth.requests, "post", no_spotify)
+    headers = {"authorization": f"Bearer {token}"}
+    assert app.spotify_auth.require_session(headers)["access_token"] == "expired-spotify"
+    clock = time.time()
+    monkeypatch.setattr(app.spotify_auth.time, "time", lambda: clock + app.spotify_auth.SESSION_MAX_AGE + 1)
+    assert app.lambda_handler(make_event("POST", "/db_results", headers=headers), None)["statusCode"] == 401
+
+
+@pytest.mark.parametrize("body", [
+    '[]', 'null', '42', '{', '{}', '{"tracks": {}}',
+    json.dumps({"tracks": [{"name": "A", "artist": "B"}] * 2}),
+    *[json.dumps({"tracks": [track]}) for track in [None, [], "x", {},
+        {"name": 1, "artist": "X"}, {"name": "Song", "artist": " "},
+        {"name": "Song", "artist": ["X"]}, {"name": "x" * 301, "artist": "X"},
+        {"name": "Song\n", "artist": "X"}, {"name": "\ud800", "artist": "X"}]],
+])
+def test_price_request_bounds_precede_database(app, monkeypatch, body):
+    monkeypatch.setattr(app, "get_engine", lambda: pytest.fail("Invalid input reached database"))
+    assert app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)["statusCode"] == 400
+
+
+def test_price_request_body_size_is_bounded(app):
+    body = json.dumps({"tracks": [{"name": "Song", "artist": "X"}], "extra": "x" * 4096})
+    assert app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)["statusCode"] == 413
+
+
+def test_admission_refusal_never_calls_stores_and_cache_hits_bypass_gate(app, track_db, monkeypatch):
+    from admission import search_slot
+    from sqlalchemy.orm import Session
+    from db import insert_tracks
+    engine = app.get_engine()
+    with Session(engine) as session:
+        saved = validated_prices("X", "Cached")
+        saved.pop("errors")
+        insert_tracks(session, [{"track_name": "Cached", "artist": "X", **saved}])
+    monkeypatch.setattr(app, "get_api_prices", lambda *a, **kw: pytest.fail("Refused or cached search started store work"))
+    with search_slot(engine):
+        response = app.lambda_handler(price_event(app, "POST", "/db_results",
+            body=json.dumps({"tracks": [{"name": "Miss", "artist": "X"}]})), None)
+        assert response["statusCode"] == 429
+        assert 1 <= int(response["headers"]["Retry-After"]) <= 60
+        assert response["headers"]["Access-Control-Expose-Headers"] == "Retry-After"
+        cached = app.lambda_handler(price_event(app, "POST", "/db_results",
+            body=json.dumps({"tracks": [{"name": "Cached", "artist": "X"}]})), None)
+        assert cached["statusCode"] == 200
+        assert json.loads(cached["body"])[0]["itunes_price"] == 1.29
+
+
+def test_pagination_continues_beyond_old_fifty_page_cutoff(app, monkeypatch):
+    import spotify_auth
+    calls = []
+    def fake_get(token, url, params=None):
+        number = len(calls)
+        calls.append(url)
+        assert params == ({"limit": 50} if number == 0 else None)
+        return {"items": [number], "next": f"{spotify_auth.API_URL}/pages/{number + 1}" if number < 52 else None}
+    monkeypatch.setattr(spotify_auth, "_get", fake_get)
+    assert len(list(spotify_auth._pages("token", f"{spotify_auth.API_URL}/pages/0", {"limit": 50}))) == 53
+    assert len(calls) == 53
+
+
+@pytest.mark.parametrize("cursor", ["https://attacker.test/page", "https://api.spotify.com/v1/items"])
+def test_pagination_rejects_foreign_or_repeated_cursors(app, monkeypatch, cursor):
+    import spotify_auth
+    monkeypatch.setattr(spotify_auth, "_get", lambda *a: {"items": [], "next": cursor})
+    with pytest.raises(spotify_auth.SpotifyError):
+        list(spotify_auth._pages("token", f"{spotify_auth.API_URL}/items", {"limit": 50}))
+
+
+def test_spotify_rate_limit_preserves_retry_after_without_retrying(app, monkeypatch):
+    import spotify_auth
+    response = FakeResponse({}, 429)
+    response.headers = {"Retry-After": "7"}
+    monkeypatch.setattr(spotify_auth.requests, "get", lambda *a, **kw: response)
+    token = spotify_auth.create_session({"access_token": "token"})
+    result = app.lambda_handler(make_event("GET", "/get_tracks/p1", headers={"Authorization": f"Bearer {token}"}), None)
+    assert result["statusCode"] == 429
+    assert result["headers"]["Retry-After"] == "7"
+
+
+def test_cache_is_rechecked_after_admission(app, track_db, monkeypatch):
+    reads = iter([{}, {("Song", "X"): validated_prices("X", "Song")}])
+    monkeypatch.setattr(app, "get_existing_tracks", lambda *a: next(reads))
+    monkeypatch.setattr(app, "get_api_prices", lambda *a, **kw: pytest.fail("Concurrent cache fill must prevent duplicate store work"))
+    response = app.lambda_handler(price_event(app, "POST", "/db_results",
+        body=json.dumps({"tracks": [{"name": "Song", "artist": "X"}]})), None)
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"])[0]["itunes_price"] == 1.29
+
+
+def test_playlist_items_skip_episodes_local_and_unavailable_tracks(app, monkeypatch):
+    import spotify_auth
+    monkeypatch.setattr(spotify_auth, "_pages", lambda *a: [{"items": [
+        None, {"item": None}, {"item": {"type": "episode", "name": "Podcast", "artists": [{"name": "X"}]}},
+        {"is_local": True, "item": {"name": "Local", "artists": [{"name": "X"}]}},
+        {"item": {"name": "Valid", "type": "track", "artists": [{"name": "X"}]}},
+    ]}])
+    assert spotify_auth.get_tracks("token", "p1") == [{"name": "Valid", "artist": "X"}]

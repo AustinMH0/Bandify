@@ -121,3 +121,48 @@ test.describe('store last-checked dates', () => {
     await expect(modal.getByRole('button', { name: 'View Playlist' })).toBeEnabled();
   });
 });
+
+test('one discovery serves StrictMode, profile and playlist filters', async ({ page }) => {
+  let reads = 0;
+  await page.route('https://prices.test/get_playlists', route => {
+    reads++;
+    expect(route.request().headers().authorization).toBe('Bearer fake-session');
+    return route.fulfill({ json: {
+      id: 'listener', display_name: 'Listener', profile_picture: null,
+      playlists: [
+        { id: 'p1', name: 'My playlist', total_tracks: 2, image: null, owner: { id: 'listener' } },
+        { id: 'p2', name: 'Shared playlist', total_tracks: 2, image: null, owner: { id: 'other' } },
+      ],
+    } });
+  });
+  await page.goto('/#session=fake-session');
+  await expect(page.getByText('My playlist', { exact: true })).toBeVisible();
+  await page.locator('input[value="All Playlists"]').click();
+  await page.getByRole('option', { name: 'Your Playlists', exact: true }).click();
+  await expect(page.getByText('Shared playlist', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('My playlist', { exact: true })).toBeVisible();
+  await page.locator('input[value="Your Playlists"]').click();
+  await page.getByRole('option', { name: 'All Playlists', exact: true }).click();
+  await expect(page.getByText('Shared playlist', { exact: true })).toBeVisible();
+  expect(reads).toBe(1);
+});
+
+test('admission cooldown keeps ripple and retries the same authenticated track', async ({ page }) => {
+  let calls = 0;
+  await page.route('https://prices.test/db_results', route => {
+    calls++;
+    expect(route.request().headers().authorization).toBe('Bearer fake-session');
+    const [track] = route.request().postDataJSON().tracks;
+    if (calls <= 2) expect(track).toEqual(tracks[0]);
+    return calls === 1
+      ? route.fulfill({ status: 429, headers: { 'Retry-After': '1', 'Access-Control-Expose-Headers': 'Retry-After' }, json: { error: 'Busy' } })
+      : route.fulfill({ json: [priceRow(track)] });
+  });
+  const modal = await openPlaylist(page);
+  await modal.getByRole('button', { name: 'View Prices', exact: true }).click();
+  await expect(modal.getByRole('status')).toHaveText('Looking up prices: 0/2');
+  await expect(modal.getByRole('status')).toHaveCount(0);
+  await expect(modal.getByRole('alert')).toHaveCount(0);
+  await expect(modal.getByRole('row').filter({ hasText: 'Blinding Lights' })).toContainText('$1.29');
+  expect(calls).toBe(3);
+});

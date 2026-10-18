@@ -8,41 +8,36 @@ import PlaylistTable from "../PlaylistTable/PlaylistTable";
 import HeroBox from "../HeroBox/HeroBox";
 import Header from "../Header/Header";
 
-import { authHeaders, clearSession, hasSession } from "../../api/session";
+import { authHeaders, hasSession } from "../../api/session";
+import { discoverPlaylists, type Discovery } from "../../api/discovery";
 import type { Playlist } from "../../types/types";
 
 export function Main() {
   const [showLoginCard, setShowLoginCard] = useState(false);
-  const [user, setUser] = useState<{ display_name: string; profile_picture: string | null } | null>(null);
+  const [user, setUser] = useState<Discovery | null>(null);
+  const [originalPlaylists, setOriginalPlaylists] = useState<Playlist[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [hideHero,] = useState(false);
 
-  const baseURL = import.meta.env.VITE_SEARCHRESULTS_API;
-
   useEffect(() => {
+    let active = true;
+    const session = authHeaders().Authorization;
     const fetchUser = async () => {
       if (!hasSession()) return;
 
       try {
-        const response = await fetch(`${baseURL}/get_playlists`, {
-          headers: authHeaders(),
-        });
-
-        if (response.status === 401) clearSession();
-        if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
-
-        const data = await response.json();
-        setUser({
-          display_name: data.display_name,
-          profile_picture: data.profile_picture,
-        });
+        const data = await discoverPlaylists();
+        if (!active || authHeaders().Authorization !== session) return;
+        setUser(data);
         setPlaylists(data.playlists);
+        setOriginalPlaylists(data.playlists);
       } catch (error) {
         console.error("Error fetching user:", error);
       }
     };
 
     fetchUser();
+    return () => { active = false; };
   }, []);
 
   const loggedIn = user !== null;
@@ -67,7 +62,8 @@ export function Main() {
           />
         </div>
         <Container>
-          <PlaylistTable playlists={playlists} setPlaylists={setPlaylists} />
+          <PlaylistTable playlists={playlists} setPlaylists={setPlaylists}
+            originalPlaylists={originalPlaylists} userId={user?.id} />
         </Container>
       </div>
     </div>

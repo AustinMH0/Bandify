@@ -6,10 +6,12 @@ import sys
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "search_results"))
 
 
 @pytest.fixture()
 def scraper(monkeypatch):
+    monkeypatch.setenv("SESSION_SECRET", "s" * 40)
     spec = importlib.util.spec_from_file_location(
         "scraper_search", ROOT / "playwright_function/search/__init__.py",
         submodule_search_locations=[str(ROOT / "playwright_function/search")],

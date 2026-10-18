@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import axios from "axios";
 import {
   Alert,
@@ -18,7 +18,7 @@ import classes from "../PlaylistTable/PlaylistTable.module.css";
 import LoadingRipple from "../LoadingAnimation/LoadingRipple";
 import PlaylistSort from "../PlaylistSort/PlaylistSort";
 
-import { authHeaders, hasSession } from "../../api/session";
+import { authHeaders } from "../../api/session";
 import type { Playlist } from "../../types/types";
 
 interface Track {
@@ -64,15 +64,17 @@ const PriceCell = ({ price, url, validatedAt }: {
 const PlaylistTable = ({
   playlists,
   setPlaylists,
+  originalPlaylists,
+  userId,
 }: {
   playlists: Playlist[];
   setPlaylists: React.Dispatch<React.SetStateAction<Playlist[]>>;
+  originalPlaylists: Playlist[];
+  userId?: string;
 }) => {
-  const [originalPlaylists, setOriginalPlaylists] = useState<Playlist[]>([]);
   const [tracks, setTracks] = useState<Record<string, Track[]>>({});
   const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
-  const [user, setUser] = useState<{ id: string; display_name: string; profile_picture: string | null; } | null>(null);
   const [showTrackTable, setTrackTable] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -118,33 +120,6 @@ const PlaylistTable = ({
     },
   };
 
-  useEffect(() => {
-    const fetchPlaylists = async () => {
-
-      const baseURL = import.meta.env.VITE_SEARCHRESULTS_API;
-
-      if (!hasSession()) return;
-
-      try {
-        const response = await axios.get(`${baseURL}/get_playlists`, {
-          headers: authHeaders(),
-        });
-        const data = response.data;
-        setUser({
-          id: data.id,
-          display_name: data.display_name,
-          profile_picture: data.profile_picture,
-        });
-        setPlaylists(data.playlists);
-        setOriginalPlaylists(data.playlists);
-      } catch (error) {
-        console.error("Error fetching playlists:", error);
-      }
-    };
-
-    fetchPlaylists();
-  }, []);
-
   const fetchTracks = async (playlistId: string) => {
 
     const baseURL = import.meta.env.VITE_SEARCHRESULTS_API;
@@ -181,9 +156,23 @@ const PlaylistTable = ({
       // behind one API Gateway/Lambda deadline or discard completed tracks.
       for (const [index, track] of tracks[selectedPlaylist].entries()) {
         try {
-          const response = await axios.post<SongPrice[]>(`${baseURL}/db_results`, {
+          const lookup = () => axios.post<SongPrice[]>(`${baseURL}/db_results`, {
             tracks: [track],
-          }, { timeout: 35000 });
+          }, { timeout: 35000, headers: authHeaders() });
+          let response;
+          // Admission refusals start no store work. Keep the existing ripple
+          // while respecting the shared cooldown, with a finite retry budget.
+          for (let attempt = 0; ; attempt++) {
+            try {
+              response = await lookup();
+              break;
+            } catch (error) {
+              if (!axios.isAxiosError(error) || error.response?.status !== 429 || attempt >= 2) throw error;
+              const seconds = Number(error.response.headers["retry-after"]);
+              const delay = Number.isFinite(seconds) ? Math.min(60, Math.max(1, seconds)) : 6;
+              await new Promise(resolve => setTimeout(resolve, delay * 1000));
+            }
+          }
           const item = response.data.find(
             (item) => item.track_name === track.name && item.artist === track.artist
           );
@@ -220,7 +209,7 @@ const PlaylistTable = ({
                   playlists={playlists}
                   setPlaylists={setPlaylists}
                   originalPlaylists={originalPlaylists}
-                  userId={user?.id}
+                  userId={userId}
                 />
                 <Grid mt="md">
                   {playlists
