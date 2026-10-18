@@ -147,22 +147,31 @@ test('one discovery serves StrictMode, profile and playlist filters', async ({ p
   expect(reads).toBe(1);
 });
 
-test('admission cooldown keeps ripple and retries the same authenticated track', async ({ page }) => {
+test('Apple cooldown shows browser prices and retries the same authenticated track', async ({ page }) => {
   let calls = 0;
+  let appleRetry;
   await page.route('https://prices.test/db_results', route => {
     calls++;
     expect(route.request().headers().authorization).toBe('Bearer fake-session');
     const [track] = route.request().postDataJSON().tracks;
     if (calls <= 2) expect(track).toEqual(tracks[0]);
-    return calls === 1
-      ? route.fulfill({ status: 429, headers: { 'Retry-After': '1', 'Access-Control-Expose-Headers': 'Retry-After' }, json: { error: 'Busy' } })
-      : route.fulfill({ json: [priceRow(track)] });
+    if (calls === 1) {
+      return route.fulfill({ json: [{ ...priceRow(track), itunes_price: -1, errors: ['itunes'], itunes_retry_after: 1 }] });
+    }
+    if (calls === 2) { appleRetry = route; return; }
+    return route.fulfill({ json: [priceRow(track)] });
   });
   const modal = await openPlaylist(page);
   await modal.getByRole('button', { name: 'View Prices', exact: true }).click();
+  await expect.poll(() => calls).toBe(2);
   await expect(modal.getByRole('status')).toHaveText('Looking up prices: 0/2');
+  const firstRow = modal.getByRole('row').filter({ hasText: 'Blinding Lights' });
+  await expect(firstRow).toContainText('$1.49');
+  await expect(firstRow).not.toContainText('$1.29');
+  await expect(modal.getByRole('alert')).toHaveCount(0);
+  await appleRetry.fulfill({ json: [priceRow(tracks[0])] });
   await expect(modal.getByRole('status')).toHaveCount(0);
   await expect(modal.getByRole('alert')).toHaveCount(0);
-  await expect(modal.getByRole('row').filter({ hasText: 'Blinding Lights' })).toContainText('$1.29');
+  await expect(firstRow).toContainText('$1.29');
   expect(calls).toBe(3);
 });

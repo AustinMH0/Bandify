@@ -69,7 +69,7 @@ Resources:
       Timeout: 20
       MemorySize: 1024
       Role: !GetAtt PlaywrightExecutionRole.Arn
-      # Must match SearchResults; only admitted coordinator requests may search.
+      # Must match SearchResults; only authenticated coordinator requests may search.
       Environment:
         Variables:
           SESSION_SECRET: !Ref SessionSecret

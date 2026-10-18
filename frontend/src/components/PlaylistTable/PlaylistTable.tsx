@@ -39,6 +39,7 @@ interface SongPrice {
   beatport_url: string;
   beatport_validated_at?: string | null;
   errors?: string[];
+  itunes_retry_after?: number;
 }
 
 const trackKey = (track: Track) => JSON.stringify([track.name, track.artist]);
@@ -159,27 +160,23 @@ const PlaylistTable = ({
           const lookup = () => axios.post<SongPrice[]>(`${baseURL}/db_results`, {
             tracks: [track],
           }, { timeout: 35000, headers: authHeaders() });
-          let response;
-          // Admission refusals start no store work. Keep the existing ripple
-          // while respecting the shared cooldown, with a finite retry budget.
+          // Apple may be deferred while browser-store prices are already
+          // usable. Merge them immediately, then retry only the uncached store.
           for (let attempt = 0; ; attempt++) {
-            try {
-              response = await lookup();
-              break;
-            } catch (error) {
-              if (!axios.isAxiosError(error) || error.response?.status !== 429 || attempt >= 2) throw error;
-              const seconds = Number(error.response.headers["retry-after"]);
-              const delay = Number.isFinite(seconds) ? Math.min(60, Math.max(1, seconds)) : 6;
-              await new Promise(resolve => setTimeout(resolve, delay * 1000));
+            const response = await lookup();
+            const item = response.data.find(
+              (item) => item.track_name === track.name && item.artist === track.artist
+            );
+            if (!item) throw new Error("Missing track in price response");
+            setSongPrices((prev) => ({ ...prev, [trackKey(track)]: item }));
+            const retryApple = item.itunes_retry_after != null && attempt < 2;
+            if (item.errors?.some(store => store !== "itunes" || !retryApple)) {
+              setPriceError("Some stores could not be reached. Retry to look up missing prices.");
             }
-          }
-          const item = response.data.find(
-            (item) => item.track_name === track.name && item.artist === track.artist
-          );
-          if (!item) throw new Error("Missing track in price response");
-          setSongPrices((prev) => ({ ...prev, [trackKey(track)]: item }));
-          if (item.errors?.length) {
-            setPriceError("Some stores could not be reached. Retry to look up missing prices.");
+            if (!retryApple) break;
+            const seconds = Number(item.itunes_retry_after);
+            const delay = Number.isFinite(seconds) ? Math.min(60, Math.max(0, seconds)) : 6;
+            await new Promise(resolve => setTimeout(resolve, delay * 1000));
           }
         } catch (error) {
           console.error("Error fetching song prices:", error);

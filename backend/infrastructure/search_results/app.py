@@ -6,7 +6,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 import spotify_auth
-from admission import Busy, search_slot
 from db import get_engine, get_existing_tracks, insert_tracks
 from search_tracks import get_api_prices
 from price_cache import STORES, PROVENANCE_FIELDS, is_fresh, utcnow
@@ -80,9 +79,6 @@ def lambda_handler(event, context):
         print("Spotify error:", str(e))
         headers = {"Retry-After": e.retry_after} if e.retry_after else None
         return respond(e.status_code, {"error": "Spotify request failed", "detail": str(e)}, headers)
-    except Busy as e:
-        return respond(429, {"error": "Price searches are busy; retry shortly"},
-                       {"Retry-After": str(e.retry_after)})
     except SQLAlchemyError as e:
         print("Database error:", str(e))
         return respond(503, {"error": "Database unavailable"})
@@ -150,34 +146,28 @@ def route(event, path, method, request_headers):
         song_data, pending = cached_projection(saved, artist, title)
 
         if pending:
-            with search_slot(engine) as reservation:
-                # Another invocation may have filled this cache between our
-                # initial read and admission. Recheck before buying store work.
+            fresh = get_api_prices(artist, title, stores=pending)
+            song_data['errors'] = fresh.get('errors', [])
+            song_data['created_at'] = fresh.get('created_at')
+            if fresh.get('itunes_retry_after') is not None:
+                song_data['itunes_retry_after'] = fresh['itunes_retry_after']
+            successful = [store for store in pending if store not in song_data['errors']]
+            update = {'track_name': title, 'artist': artist}
+            for store in pending:
+                for field in ('price', 'url'):
+                    key = f'{store}_{field}'
+                    song_data[key] = fresh.get(key, -1 if field == 'price' else '')
+                # Failed stores remain in storage but their stale prices are
+                # withheld. Save successful providers independently.
+                if store in successful:
+                    song_data[f'{store}_validated_at'] = fresh.get(f'{store}_validated_at')
+                    for field in ('price', 'url', *PROVENANCE_FIELDS):
+                        key = f'{store}_{field}'
+                        update[key] = fresh.get(key)
+            if successful:
+                update['created_at'] = fresh.get('created_at')
                 with Session(engine) as session:
-                    saved = get_existing_tracks(session, [title], [artist]).get((title, artist), {})
-                song_data, pending = cached_projection(saved, artist, title)
-                if pending:
-                    fresh = get_api_prices(artist, title, stores=pending)
-                    reservation.scraper_inflight = fresh.get('_scraper_inflight', False)
-                    song_data['errors'] = fresh.get('errors', [])
-                    song_data['created_at'] = fresh.get('created_at')
-                    successful = [store for store in pending if store not in song_data['errors']]
-                    update = {'track_name': title, 'artist': artist}
-                    for store in pending:
-                        for field in ('price', 'url'):
-                            key = f'{store}_{field}'
-                            song_data[key] = fresh.get(key, -1 if field == 'price' else '')
-                        # Failed stores remain in storage but their stale prices are
-                        # withheld. Save successful providers independently.
-                        if store in successful:
-                            song_data[f'{store}_validated_at'] = fresh.get(f'{store}_validated_at')
-                            for field in ('price', 'url', *PROVENANCE_FIELDS):
-                                key = f'{store}_{field}'
-                                update[key] = fresh.get(key)
-                    if successful:
-                        update['created_at'] = fresh.get('created_at')
-                        with Session(engine) as session:
-                            insert_tracks(session, [update])
+                    insert_tracks(session, [update])
 
         return respond(200, [song_data])
 

@@ -514,13 +514,7 @@ def test_transport_failure_returns_partial_prices_without_poisoning_cache(app, t
 
     monkeypatch.setattr(search_tracks.requests, "post", unavailable)
     body = json.dumps({"tracks": [{"name": "New Song", "artist": "X"}]})
-    for attempt in range(2):
-        if attempt:
-            # A read timeout can leave the scraper running. Retry only after
-            # its shared lease has expired (simulate time without sleeping).
-            from sqlalchemy import text
-            with track_db.begin() as connection:
-                connection.execute(text("UPDATE price_search_admission SET lease_until = 0, next_allowed = 0"))
+    for _ in range(2):
         response = app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
         assert response["statusCode"] == 200
         row = json.loads(response["body"])[0]
@@ -819,28 +813,6 @@ def test_price_request_body_size_is_bounded(app):
     assert app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)["statusCode"] == 413
 
 
-def test_admission_refusal_never_calls_stores_and_cache_hits_bypass_gate(app, track_db, monkeypatch):
-    from admission import search_slot
-    from sqlalchemy.orm import Session
-    from db import insert_tracks
-    engine = app.get_engine()
-    with Session(engine) as session:
-        saved = validated_prices("X", "Cached")
-        saved.pop("errors")
-        insert_tracks(session, [{"track_name": "Cached", "artist": "X", **saved}])
-    monkeypatch.setattr(app, "get_api_prices", lambda *a, **kw: pytest.fail("Refused or cached search started store work"))
-    with search_slot(engine):
-        response = app.lambda_handler(price_event(app, "POST", "/db_results",
-            body=json.dumps({"tracks": [{"name": "Miss", "artist": "X"}]})), None)
-        assert response["statusCode"] == 429
-        assert 1 <= int(response["headers"]["Retry-After"]) <= 60
-        assert response["headers"]["Access-Control-Expose-Headers"] == "Retry-After"
-        cached = app.lambda_handler(price_event(app, "POST", "/db_results",
-            body=json.dumps({"tracks": [{"name": "Cached", "artist": "X"}]})), None)
-        assert cached["statusCode"] == 200
-        assert json.loads(cached["body"])[0]["itunes_price"] == 1.29
-
-
 def test_pagination_continues_beyond_old_fifty_page_cutoff(app, monkeypatch):
     import spotify_auth
     calls = []
@@ -873,16 +845,6 @@ def test_spotify_rate_limit_preserves_retry_after_without_retrying(app, monkeypa
     assert result["headers"]["Retry-After"] == "7"
 
 
-def test_cache_is_rechecked_after_admission(app, track_db, monkeypatch):
-    reads = iter([{}, {("Song", "X"): validated_prices("X", "Song")}])
-    monkeypatch.setattr(app, "get_existing_tracks", lambda *a: next(reads))
-    monkeypatch.setattr(app, "get_api_prices", lambda *a, **kw: pytest.fail("Concurrent cache fill must prevent duplicate store work"))
-    response = app.lambda_handler(price_event(app, "POST", "/db_results",
-        body=json.dumps({"tracks": [{"name": "Song", "artist": "X"}]})), None)
-    assert response["statusCode"] == 200
-    assert json.loads(response["body"])[0]["itunes_price"] == 1.29
-
-
 def test_playlist_items_skip_episodes_local_and_unavailable_tracks(app, monkeypatch):
     import spotify_auth
     monkeypatch.setattr(spotify_auth, "_pages", lambda *a: [{"items": [
@@ -891,3 +853,111 @@ def test_playlist_items_skip_episodes_local_and_unavailable_tracks(app, monkeypa
         {"item": {"name": "Valid", "type": "track", "artists": [{"name": "X"}]}},
     ]}])
     assert spotify_auth.get_tracks("token", "p1") == [{"name": "Valid", "artist": "X"}]
+
+
+def test_busy_itunes_still_searches_browser_stores_and_retries_only_apple(app, track_db, scraper, monkeypatch):
+    import search_tracks
+    from admission import itunes_slot
+    from search.matching import store_result
+    from sqlalchemy import text
+
+    engine = app.get_engine()
+    apple_calls, browser_calls = [], []
+    def apple(artist, title):
+        apple_calls.append(title)
+        return store_result(1.29, "https://itunes.example/song", artist, title)
+    def proxy(url, json, headers, timeout):
+        import json as json_module
+        browser_calls.append(json["stores"])
+        result = scraper.lambda_handler({"body": json_module.dumps(json), "headers": headers}, None)
+        return FakeResponse(json_module.loads(result["body"]), result["statusCode"])
+    monkeypatch.setattr(search_tracks.ItuneSearch, "search_song", apple)
+    monkeypatch.setattr(search_tracks, "PLAYWRIGHT_API_URL", "https://scraper.example")
+    monkeypatch.setattr(search_tracks.requests, "post", proxy)
+    event = price_event(app, "POST", "/db_results", body=json.dumps({"tracks": [{"name": "Song", "artist": "X"}]}))
+    with itunes_slot(engine):
+        for _ in range(2):
+            result = app.lambda_handler(event, None)
+            assert result["statusCode"] == 200
+            row = json.loads(result["body"])[0]
+            assert row["errors"] == ["itunes"]
+            assert 1 <= row["itunes_retry_after"] <= 60
+            assert row["itunes_price"] == -1
+            assert row["bandcamp_price"] == 0.99 and row["beatport_price"] == 1.49
+        assert apple_calls == []
+        # The first request searched both browser stores despite Apple's active
+        # lease; the second reused their newly persisted results.
+        assert browser_calls == [["bandcamp", "beatport"]]
+    result = app.lambda_handler(event, None)
+    assert result["statusCode"] == 200
+    row = json.loads(result["body"])[0]
+    assert row["errors"] == [] and row["itunes_price"] == 1.29
+    assert "itunes_retry_after" not in row
+    assert apple_calls == ["Song"] and len(browser_calls) == 1
+    # Even a held Apple lease does not affect a complete cache hit.
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE itunes_search_admission SET next_allowed = 0"))
+    with itunes_slot(engine):
+        cached = app.lambda_handler(event, None)
+        assert cached["statusCode"] == 200
+        assert json.loads(cached["body"])[0]["errors"] == []
+        assert "itunes_retry_after" not in json.loads(cached["body"])[0]
+    assert apple_calls == ["Song"] and len(browser_calls) == 1
+
+
+def test_browser_only_search_bypasses_apple_database_admission(app, scraper, monkeypatch):
+    import search_tracks
+    def no_gate(*args, **kwargs):
+        pytest.fail("Browser-only work must not touch Apple's gate")
+    def proxy(url, json, headers, timeout):
+        import json as json_module
+        result = scraper.lambda_handler({"body": json_module.dumps(json), "headers": headers}, None)
+        return FakeResponse(json_module.loads(result["body"]), result["statusCode"])
+    monkeypatch.setattr(search_tracks, "itunes_slot", no_gate)
+    monkeypatch.setattr(search_tracks, "get_engine", no_gate)
+    monkeypatch.setattr(search_tracks, "PLAYWRIGHT_API_URL", "https://scraper.example")
+    monkeypatch.setattr(search_tracks.requests, "post", proxy)
+    prices = search_tracks.get_api_prices("X", "Song", stores=["bandcamp", "beatport"])
+    assert prices["errors"] == []
+    assert prices["bandcamp_price"] == 0.99 and prices["beatport_price"] == 1.49
+
+
+def test_apple_slot_is_released_before_browser_request(app, track_db, scraper, monkeypatch):
+    import search_tracks
+    from search.matching import store_result
+    from sqlalchemy import text
+    monkeypatch.setattr(search_tracks.ItuneSearch, "search_song", lambda artist, title: store_result(1.29, "https://itunes.example/song", artist, title))
+    monkeypatch.setattr(search_tracks, "PLAYWRIGHT_API_URL", "https://scraper.example")
+    def proxy(url, json, headers, timeout):
+        import json as json_module
+        with app.get_engine().connect() as connection:
+            owner, lease = connection.execute(text("SELECT owner, lease_until FROM itunes_search_admission")).one()
+            assert owner is None and lease == 0
+        result = scraper.lambda_handler({"body": json_module.dumps(json), "headers": headers}, None)
+        return FakeResponse(json_module.loads(result["body"]), result["statusCode"])
+    monkeypatch.setattr(search_tracks.requests, "post", proxy)
+    event = price_event(app, "POST", "/db_results", body=json.dumps({"tracks": [{"name": "Song", "artist": "X"}]}))
+    assert json.loads(app.lambda_handler(event, None)["body"])[0]["errors"] == []
+
+
+def test_browser_work_consumes_apple_retry_delay(app, track_db, scraper, monkeypatch):
+    import search_tracks
+    from admission import Busy
+    from contextlib import contextmanager
+    clock = [0]
+    @contextmanager
+    def busy(*args):
+        raise Busy(6)
+        yield
+    def proxy(url, json, headers, timeout):
+        import json as json_module
+        clock[0] = 7  # Browser-store work outlasted Apple's cooldown.
+        result = scraper.lambda_handler({"body": json_module.dumps(json), "headers": headers}, None)
+        return FakeResponse(json_module.loads(result["body"]), result["statusCode"])
+    monkeypatch.setattr(search_tracks, "itunes_slot", busy)
+    monkeypatch.setattr(search_tracks.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(search_tracks, "PLAYWRIGHT_API_URL", "https://scraper.example")
+    monkeypatch.setattr(search_tracks.requests, "post", proxy)
+    prices = search_tracks.get_api_prices("X", "Song")
+    assert prices["itunes_retry_after"] == 0
+    assert prices["bandcamp_price"] == 0.99 and prices["beatport_price"] == 1.49

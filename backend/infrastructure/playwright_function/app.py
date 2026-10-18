@@ -9,7 +9,7 @@ from search import BandcampSearch, BeatportSearch
 
 def lambda_handler(event, context):
     # This endpoint is internal to SearchResults. A browser session alone cannot
-    # bypass its app-wide admission gate by calling the scraper directly.
+    # call the scraper directly; only the authenticated coordinator signs calls.
     headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
     credential = headers.get("authorization", "")
     secret = os.environ.get("SESSION_SECRET", "")
