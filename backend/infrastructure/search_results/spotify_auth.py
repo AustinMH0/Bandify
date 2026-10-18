@@ -21,7 +21,6 @@ STATE_MAX_AGE = 600
 # How long a sign-in lasts before the user has to log in again
 SESSION_MAX_AGE = 7 * 24 * 60 * 60
 REQUEST_TIMEOUT = 8
-MAX_PAGES = 50
 
 REQUIRED_SETTINGS = ("CLIENT_ID", "CLIENT_SECRET", "SESSION_SECRET")
 
@@ -36,6 +35,11 @@ class ConfigError(Exception):
 
 class SpotifyError(Exception):
     """Spotify answered with something we cannot use."""
+
+    def __init__(self, message, status_code=502, retry_after=None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.retry_after = retry_after
 
 
 def check_config():
@@ -139,14 +143,21 @@ def callback(event, headers):
     return create_session(token_info), _cookie("", 0)
 
 
-def access_token(headers):
-    """Returns a usable Spotify access token for the signed-in caller."""
-    check_config()
+def require_session(headers):
+    """Authenticate local price reads without contacting/refreshing Spotify."""
     scheme, _, session_token = headers.get("authorization", "").partition(" ")
     if scheme.lower() != "bearer" or not session_token.strip():
         raise AuthError("Not signed in")
 
-    session = read_session(session_token.strip())
+    if not os.environ.get("SESSION_SECRET"):
+        raise ConfigError("Missing settings: SESSION_SECRET")
+    return read_session(session_token.strip())
+
+
+def access_token(headers):
+    """Returns a usable Spotify access token for the signed-in caller."""
+    session = require_session(headers)
+    check_config()
     if session["expires_at"] - 60 > time.time():
         return session["access_token"]
     if not session.get("refresh_token"):
@@ -173,21 +184,28 @@ def _get(token, url, params=None):
         raise SpotifyError(f"Could not reach Spotify: {type(e).__name__}")
     if response.status_code == 401:
         raise AuthError("Spotify rejected the session")
+    if response.status_code == 403:
+        raise SpotifyError("Spotify permits playlist items only for owners or collaborators", 403)
+    if response.status_code == 404:
+        raise SpotifyError("Playlist not found or unavailable to this account", 404)
+    if response.status_code == 429:
+        retry = str(response.headers.get("Retry-After", "1"))
+        raise SpotifyError("Spotify rate limit reached", 429, retry if retry.isdigit() else "1")
     if response.status_code != 200:
-        error = SpotifyError(f"Spotify returned {response.status_code}")
-        error.status_code = response.status_code
-        raise error
+        raise SpotifyError(f"Spotify returned {response.status_code}")
     return response.json()
 
 
 def _pages(token, url, params):
-    page = _get(token, url, params)
-    for _ in range(MAX_PAGES):
+    seen = set()
+    while url:
+        if not isinstance(url, str) or not url.startswith(API_URL + "/") or url in seen:
+            raise SpotifyError("Invalid Spotify pagination cursor")
+        seen.add(url)
+        page = _get(token, url, params)
         yield page
-        next_url = page.get("next")
-        if not next_url or not next_url.startswith(API_URL + "/"):
-            return
-        page = _get(token, next_url)
+        url = page.get("next")
+        params = None
 
 
 def get_playlists(token):
@@ -224,22 +242,14 @@ def get_playlists(token):
 
 def get_tracks(token, playlist_id):
     if not re.fullmatch(r"[A-Za-z0-9]+", playlist_id or ""):
-        raise SpotifyError("Invalid playlist id")
-
-    params = {"limit": 100}
-    try:
-        pages = list(_pages(token, f"{API_URL}/playlists/{playlist_id}/items", params))
-    except SpotifyError as e:
-        if getattr(e, "status_code", None) != 404:
-            raise
-        # Endpoint name before Spotify's February 2026 API change
-        pages = list(_pages(token, f"{API_URL}/playlists/{playlist_id}/tracks", params))
+        raise SpotifyError("Invalid playlist id", 400)
 
     tracks = []
-    for page in pages:
+    for page in _pages(token, f"{API_URL}/playlists/{playlist_id}/items", {"limit": 50}):
         for entry in page.get("items") or []:
             track = (entry or {}).get("item") or (entry or {}).get("track")
-            if not track or not track.get("name"):
+            if (not track or not track.get("name") or entry.get("is_local") or track.get("is_local")
+                    or track.get("type", "track") != "track" or not track.get("artists")):
                 continue
             tracks.append({
                 "name": track["name"],

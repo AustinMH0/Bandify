@@ -70,6 +70,7 @@ jobs:
 
       - name: Deploy Playwright Stack
         env:
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -82,7 +83,7 @@ jobs:
             --s3-bucket $AWS_S3_BUCKET \
             --s3-prefix sam-artifacts/playwright \
             --image-repositories PlaywrightFunction=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/bandify-playwright \
-            --parameter-overrides S3BucketName=$AWS_S3_BUCKET \
+            --parameter-overrides S3BucketName=$AWS_S3_BUCKET SessionSecret=$SESSION_SECRET \
             --no-confirm-changeset
 
       - name: Dump Playwright stack events

@@ -96,3 +96,19 @@ def test_function_role_can_manage_vpc_network_interfaces(resources):
 
 def test_function_timeout_stays_under_api_gateway_limit(resources):
     assert resources["SearchResultsFunction"]["Properties"]["Timeout"] < 29
+
+
+def test_scraper_uses_existing_session_secret_and_workflow_passes_it():
+    directory = os.path.dirname(TEMPLATE)
+    with open(os.path.join(directory, "template-playwright.yaml")) as source:
+        template = yaml.load(source, Loader=CfnLoader)
+    secret = template["Parameters"]["SessionSecret"]
+    assert secret["NoEcho"] is True and secret["MinLength"] >= 32
+    environment = template["Resources"]["PlaywrightFunction"]["Properties"]["Environment"]["Variables"]
+    assert environment["SESSION_SECRET"] == {"Ref": "SessionSecret"}
+    with open(os.path.join(directory, "..", "..", ".github", "workflows", "sam_deploy.yaml")) as source:
+        workflow = yaml.safe_load(source)
+    steps = [step for job in workflow["jobs"].values() for step in job["steps"]]
+    deploy = next(step for step in steps if step.get("name") == "Deploy Playwright Stack")
+    assert deploy["env"]["SESSION_SECRET"] == "${{ secrets.SESSION_SECRET }}"
+    assert "SessionSecret=$SESSION_SECRET" in deploy["run"]

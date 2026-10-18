@@ -1,8 +1,17 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: Playwright API Stack
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@3
 
 Parameters:
+  SessionSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: Existing session secret shared with SearchResults to authenticate internal scraper calls
+
   S3BucketName:
     Type: String
     Description: Name of the S3 bucket this Lambda function will access
@@ -60,6 +69,10 @@ Resources:
       Timeout: 20
       MemorySize: 1024
       Role: !GetAtt PlaywrightExecutionRole.Arn
+      # Must match SearchResults; only authenticated coordinator requests may search.
+      Environment:
+        Variables:
+          SESSION_SECRET: !Ref SessionSecret
       Events:
         apiPlaywright:
           Type: Api

@@ -121,3 +121,57 @@ test.describe('store last-checked dates', () => {
     await expect(modal.getByRole('button', { name: 'View Playlist' })).toBeEnabled();
   });
 });
+
+test('one discovery serves StrictMode, profile and playlist filters', async ({ page }) => {
+  let reads = 0;
+  await page.route('https://prices.test/get_playlists', route => {
+    reads++;
+    expect(route.request().headers().authorization).toBe('Bearer fake-session');
+    return route.fulfill({ json: {
+      id: 'listener', display_name: 'Listener', profile_picture: null,
+      playlists: [
+        { id: 'p1', name: 'My playlist', total_tracks: 2, image: null, owner: { id: 'listener' } },
+        { id: 'p2', name: 'Shared playlist', total_tracks: 2, image: null, owner: { id: 'other' } },
+      ],
+    } });
+  });
+  await page.goto('/#session=fake-session');
+  await expect(page.getByText('My playlist', { exact: true })).toBeVisible();
+  await page.locator('input[value="All Playlists"]').click();
+  await page.getByRole('option', { name: 'Your Playlists', exact: true }).click();
+  await expect(page.getByText('Shared playlist', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('My playlist', { exact: true })).toBeVisible();
+  await page.locator('input[value="Your Playlists"]').click();
+  await page.getByRole('option', { name: 'All Playlists', exact: true }).click();
+  await expect(page.getByText('Shared playlist', { exact: true })).toBeVisible();
+  expect(reads).toBe(1);
+});
+
+test('Apple cooldown shows browser prices and retries the same authenticated track', async ({ page }) => {
+  let calls = 0;
+  let appleRetry;
+  await page.route('https://prices.test/db_results', route => {
+    calls++;
+    expect(route.request().headers().authorization).toBe('Bearer fake-session');
+    const [track] = route.request().postDataJSON().tracks;
+    if (calls <= 2) expect(track).toEqual(tracks[0]);
+    if (calls === 1) {
+      return route.fulfill({ json: [{ ...priceRow(track), itunes_price: -1, errors: ['itunes'], itunes_retry_after: 1 }] });
+    }
+    if (calls === 2) { appleRetry = route; return; }
+    return route.fulfill({ json: [priceRow(track)] });
+  });
+  const modal = await openPlaylist(page);
+  await modal.getByRole('button', { name: 'View Prices', exact: true }).click();
+  await expect.poll(() => calls).toBe(2);
+  await expect(modal.getByRole('status')).toHaveText('Looking up prices: 0/2');
+  const firstRow = modal.getByRole('row').filter({ hasText: 'Blinding Lights' });
+  await expect(firstRow).toContainText('$1.49');
+  await expect(firstRow).not.toContainText('$1.29');
+  await expect(modal.getByRole('alert')).toHaveCount(0);
+  await appleRetry.fulfill({ json: [priceRow(tracks[0])] });
+  await expect(modal.getByRole('status')).toHaveCount(0);
+  await expect(modal.getByRole('alert')).toHaveCount(0);
+  await expect(firstRow).toContainText('$1.29');
+  expect(calls).toBe(3);
+});
