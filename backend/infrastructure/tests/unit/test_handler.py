@@ -428,6 +428,36 @@ def test_price_lookup_requires_tracks(app):
     assert response["statusCode"] == 400
 
 
+def test_price_response_includes_each_stores_utc_validation_time(app, track_db, monkeypatch):
+    import datetime
+
+    now = datetime.datetime(2026, 10, 17, 12, tzinfo=datetime.timezone.utc)
+    monkeypatch.setattr(app, "utcnow", lambda: now)
+    timestamps = {store: now - datetime.timedelta(days=days)
+                  for days, store in enumerate(("itunes", "bandcamp", "beatport"))}
+
+    def fake_prices(artist, title, stores):
+        return {**validated_prices(artist, title, stores),
+                **{f"{store}_validated_at": timestamps[store] for store in stores}}
+
+    monkeypatch.setattr(app, "get_api_prices", fake_prices)
+    body = json.dumps({"tracks": [{"name": "Song", "artist": "Artist"}]})
+    first = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+
+    def unexpected_search(*args, **kwargs):
+        pytest.fail("Validated prices should be reused")
+
+    monkeypatch.setattr(app, "get_api_prices", unexpected_search)
+    cached = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+    for response in (first, cached):
+        assert response["statusCode"] == 200
+        row = json.loads(response["body"])[0]
+        for store, timestamp in timestamps.items():
+            # Cached SQLite timestamps are naive but must still be serialized as UTC.
+            assert row[f"{store}_validated_at"] == timestamp.isoformat()
+        assert row["bandcamp_price"] == -1  # Completed no-match is also checked.
+
+
 def test_new_track_crosses_scraper_http_boundary_and_is_committed(app, track_db, scraper, monkeypatch):
     import search_tracks
     from search.matching import store_result
@@ -481,6 +511,9 @@ def test_transport_failure_returns_partial_prices_without_poisoning_cache(app, t
         row = json.loads(response["body"])[0]
         assert row["itunes_price"] == 0.99
         assert row["errors"] == ["bandcamp", "beatport"]
+        assert row["itunes_validated_at"].endswith("+00:00")
+        assert row["bandcamp_validated_at"] is None
+        assert row["beatport_validated_at"] is None
     assert len(calls) == 2
     stored = app.lambda_handler(make_event("GET", "/db_results"), None)
     saved = json.loads(stored["body"])
@@ -530,6 +563,9 @@ def test_legacy_wrong_prices_are_rechecked_and_never_used_as_fallback(app, track
     assert calls == [("The Weeknd", "Blinding Lights")]
     assert row["bandcamp_price"] == -1
     assert row["bandcamp_url"] == ""
+    assert row["bandcamp_validated_at"] is None
+    assert row["itunes_validated_at"] is None
+    assert row["beatport_validated_at"] is None
     assert row["itunes_price"] == 1.29
     with track_db.connect() as connection:
         stored = connection.execute(table.select()).mappings().all()
@@ -662,6 +698,9 @@ def test_partial_store_failure_saves_successes_and_retries_only_failure(app, tra
     assert row["errors"] == ["bandcamp"]
     assert (row["itunes_price"], row["beatport_price"], row["bandcamp_price"]) == (1.29, 1.49, -1)
     assert row["bandcamp_url"] == ""
+    assert row["bandcamp_validated_at"] is None
+    assert row["itunes_validated_at"].endswith("+00:00")
+    assert row["beatport_validated_at"].endswith("+00:00")
     with track_db.connect() as connection:
         saved = connection.execute(table.select()).mappings().one()
     assert saved["bandcamp_validated_at"] == stale
@@ -710,7 +749,11 @@ def test_old_scraper_cannot_certify_current_cache(app, track_db, monkeypatch):
     monkeypatch.setattr(search_tracks.requests, "post", old_scraper)
     body = json.dumps({"tracks": [{"name": "Song A", "artist": "X"}]})
     for _ in range(2):
-        assert app.lambda_handler(make_event("POST", "/db_results", body=body), None)["statusCode"] == 200
+        response = app.lambda_handler(make_event("POST", "/db_results", body=body), None)
+        assert response["statusCode"] == 200
+        row = json.loads(response["body"])[0]
+        assert row["bandcamp_validated_at"] is None
+        assert row["beatport_validated_at"] is None
     saved = json.loads(app.lambda_handler(make_event("GET", "/db_results"), None)["body"])[0]
     assert saved["itunes_validated_at"]
     assert saved["bandcamp_validated_at"] is None

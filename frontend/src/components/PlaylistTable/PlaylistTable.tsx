@@ -31,19 +31,34 @@ interface SongPrice {
   artist: string;
   itunes_price: number | null;
   itunes_url: string;
+  itunes_validated_at?: string | null;
   bandcamp_price: number | null;
   bandcamp_url: string;
+  bandcamp_validated_at?: string | null;
   beatport_price: number | null;
   beatport_url: string;
+  beatport_validated_at?: string | null;
   errors?: string[];
 }
 
 const trackKey = (track: Track) => JSON.stringify([track.name, track.artist]);
 
-const PriceCell = ({ price, url }: { price?: number | null; url?: string }) => {
-  if (price == null || !Number.isFinite(price) || price < 0) return <>N/A</>;
-  const label = `$${price.toFixed(2)}`;
-  return url ? <a href={url}>{label}</a> : <>{label}</>;
+const PriceCell = ({ price, url, validatedAt }: {
+  price?: number | null;
+  url?: string;
+  validatedAt?: string | null;
+}) => {
+  const label = price == null || !Number.isFinite(price) || price < 0
+    ? "N/A" : `$${price.toFixed(2)}`;
+  const checked = validatedAt ? new Date(validatedAt) : null;
+  return <>
+    {url && label !== "N/A" ? <a href={url}>{label}</a> : label}
+    {checked && Number.isFinite(checked.getTime()) && (
+      <Text component="time" dateTime={validatedAt ?? undefined} size="xs" c="dimmed" span>
+        {" "}checked {checked.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+      </Text>
+    )}
+  </>;
 };
 
 const PlaylistTable = ({
@@ -344,13 +359,13 @@ const PlaylistTable = ({
                         <Table.Tr key={index}>
                           <Table.Td>{track.name}</Table.Td>
                           <Table.Td>
-                            <PriceCell price={songPrices[trackKey(track)]?.bandcamp_price} url={songPrices[trackKey(track)]?.bandcamp_url} />
+                            <PriceCell price={songPrices[trackKey(track)]?.bandcamp_price} url={songPrices[trackKey(track)]?.bandcamp_url} validatedAt={songPrices[trackKey(track)]?.bandcamp_validated_at} />
                           </Table.Td>
                           <Table.Td>
-                            <PriceCell price={songPrices[trackKey(track)]?.beatport_price} url={songPrices[trackKey(track)]?.beatport_url} />
+                            <PriceCell price={songPrices[trackKey(track)]?.beatport_price} url={songPrices[trackKey(track)]?.beatport_url} validatedAt={songPrices[trackKey(track)]?.beatport_validated_at} />
                           </Table.Td>
                           <Table.Td>
-                            <PriceCell price={songPrices[trackKey(track)]?.itunes_price} url={songPrices[trackKey(track)]?.itunes_url} />
+                            <PriceCell price={songPrices[trackKey(track)]?.itunes_price} url={songPrices[trackKey(track)]?.itunes_url} validatedAt={songPrices[trackKey(track)]?.itunes_validated_at} />
                           </Table.Td>
                         </Table.Tr>
                       ))}

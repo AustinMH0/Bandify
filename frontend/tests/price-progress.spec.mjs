@@ -76,3 +76,48 @@ test('provider error removes ripple and keeps successful store prices', async ({
   await expect(modal.getByRole('button', { name: 'Retry Prices' })).toBeEnabled();
   await expect(modal.getByRole('row').filter({ hasText: 'Blinding Lights' })).toContainText('$1.49');
 });
+
+test.describe('store last-checked dates', () => {
+  test.use({ locale: 'en-US', timezoneId: 'America/Denver' });
+
+  test('shows each store date in local time as prices arrive and hides unchecked dates', async ({ page }) => {
+    const pending = [];
+    await page.route('https://prices.test/db_results', route => { pending.push(route); });
+    const modal = await openPlaylist(page);
+    await modal.getByRole('button', { name: 'View Prices', exact: true }).click();
+    await expect(modal.locator('time')).toHaveCount(0);
+    await expect.poll(() => pending.length).toBe(1);
+    await pending[0].fulfill({ json: [{
+      ...priceRow(tracks[0]),
+      // UTC Oct 18 is still Oct 17 in the browser's timezone.
+      itunes_validated_at: '2026-10-18T01:30:00+00:00',
+      itunes_url: 'https://itunes.example/song',
+      bandcamp_validated_at: '2026-10-16T18:00:00+00:00',
+      beatport_validated_at: null,
+    }] });
+    await expect(modal.getByRole('status')).toHaveText('Looking up prices: 1/2');
+    const firstCells = modal.getByRole('row').filter({ hasText: 'Blinding Lights' }).getByRole('cell');
+    await expect(firstCells.nth(1)).toHaveText('N/A checked Oct 16');
+    await expect(firstCells.nth(2)).toHaveText('$1.49');
+    await expect(firstCells.nth(3).locator('time')).toHaveText('checked Oct 17');
+    await expect(firstCells.nth(3).getByRole('link', { name: '$1.29' })).toHaveAttribute('href', 'https://itunes.example/song');
+    await expect(firstCells.nth(3).locator('time')).toHaveAttribute('datetime', '2026-10-18T01:30:00+00:00');
+    await expect(modal.getByRole('row').filter({ hasText: 'Deja Vu' }).locator('time')).toHaveCount(0);
+
+    await expect.poll(() => pending.length).toBe(2);
+    await pending[1].fulfill({ json: [{
+      ...priceRow(tracks[1]),
+      bandcamp_price: 0,
+      bandcamp_validated_at: '2026-10-17T20:00:00+00:00',
+      itunes_validated_at: 'invalid-date',
+      // An older API response may omit the timestamp entirely.
+    }] });
+    await expect(modal.getByRole('status')).toHaveCount(0);
+    const secondCells = modal.getByRole('row').filter({ hasText: 'Deja Vu' }).getByRole('cell');
+    await expect(secondCells.nth(1)).toHaveText('$0.00 checked Oct 17');
+    await expect(secondCells.nth(2).locator('time')).toHaveCount(0);
+    await expect(secondCells.nth(3).locator('time')).toHaveCount(0);
+    await expect(firstCells.nth(3).locator('time')).toHaveText('checked Oct 17');
+    await expect(modal.getByRole('button', { name: 'View Playlist' })).toBeEnabled();
+  });
+});
