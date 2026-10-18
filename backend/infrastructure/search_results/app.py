@@ -24,7 +24,12 @@ def json_default(value):
     # Postgres NUMERIC and TIMESTAMP columns come back as Decimal and datetime
     if isinstance(value, decimal.Decimal):
         return float(value)
-    if isinstance(value, (datetime.datetime, datetime.date)):
+    if isinstance(value, datetime.datetime):
+        # Validation columns may return naive datetimes; they are stored in UTC.
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=datetime.timezone.utc)
+        return value.astimezone(datetime.timezone.utc).isoformat()
+    if isinstance(value, datetime.date):
         return value.isoformat()
     raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
@@ -125,6 +130,7 @@ def route(event, path, method, request_headers):
                 for store in STORES:
                     song_data[f'{store}_price'] = saved.get(f'{store}_price', -1) if store not in pending else -1
                     song_data[f'{store}_url'] = saved.get(f'{store}_url', '') if store not in pending else ''
+                    song_data[f'{store}_validated_at'] = saved.get(f'{store}_validated_at') if store not in pending else None
 
                 if pending:
                     fresh = get_api_prices(artist, title, stores=pending)
@@ -139,6 +145,7 @@ def route(event, path, method, request_headers):
                         # Preserve failed stores in storage, but never return their
                         # stale prices. Save successful providers independently.
                         if store in successful:
+                            song_data[f'{store}_validated_at'] = fresh.get(f'{store}_validated_at')
                             for field in ('price', 'url', *PROVENANCE_FIELDS):
                                 key = f'{store}_{field}'
                                 update[key] = fresh.get(key)
