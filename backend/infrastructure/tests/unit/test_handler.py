@@ -65,7 +65,10 @@ def app(monkeypatch, tmp_path):
     # admission behavior is exercised with real defaults in test_admission.py.
     import admission
     monkeypatch.setattr(admission, "SEARCH_INTERVAL", 0)
-    return load_modules()
+    module = load_modules()
+    import search_tracks
+    monkeypatch.setattr(search_tracks, "discover_bandcamp_sites", lambda *args: ["https://bicep.bandcamp.com"])
+    return module
 
 
 def sign_in(app, monkeypatch, expires_in=3600):
@@ -383,7 +386,7 @@ def validated_prices(artist, title, stores=("itunes", "bandcamp", "beatport")):
 
     now = utcnow()
     result = {"errors": [], "created_at": now}
-    for store, price in [("itunes", 1.29), ("bandcamp", -1), ("beatport", 1.49)]:
+    for store, price in [("itunes", 1.29), ("bandcamp", 0.99), ("beatport", 1.49)]:
         if store not in stores:
             continue
         result.update({
@@ -407,7 +410,7 @@ def test_price_lookup_reuses_validated_tracks_without_duplicates(app, track_db, 
         return {
             **validated_prices(artist, track_name, stores),
             "itunes_price": 1.29, "itunes_url": "https://itunes.example/a",
-            "bandcamp_price": -1, "bandcamp_url": "",
+            "bandcamp_price": 0.99, "bandcamp_url": "https://bandcamp.example/a",
             "beatport_price": 1.49, "beatport_url": "https://beatport.example/a",
             "created_at": datetime.datetime(2026, 1, 1, 12, 0, 0),
         }
@@ -464,7 +467,7 @@ def test_price_response_includes_each_stores_utc_validation_time(app, track_db, 
         for store, timestamp in timestamps.items():
             # Cached SQLite timestamps are naive but must still be serialized as UTC.
             assert row[f"{store}_validated_at"] == timestamp.isoformat()
-        assert row["bandcamp_price"] == -1  # Completed no-match is also checked.
+        assert row["bandcamp_price"] == 0.99
 
 
 def test_new_track_crosses_scraper_http_boundary_and_is_committed(app, track_db, scraper, monkeypatch):
@@ -496,7 +499,7 @@ def test_new_track_crosses_scraper_http_boundary_and_is_committed(app, track_db,
     second = app.lambda_handler(price_event(app, "POST", "/db_results", body=body), None)
     assert second["statusCode"] == 200
     assert json.loads(second["body"])[0]["bandcamp_price"] == 0.99
-    assert calls == [{"artist": "X", "track_name": "New Song", "stores": ["bandcamp", "beatport"]}]
+    assert calls == [{"artist": "X", "track_name": "New Song", "stores": ["bandcamp", "beatport"], "bandcamp_sites": ["https://bicep.bandcamp.com"]}]
 
 
 def test_transport_failure_returns_partial_prices_without_poisoning_cache(app, track_db, monkeypatch):
@@ -706,7 +709,7 @@ def test_partial_store_failure_saves_successes_and_retries_only_failure(app, tra
     row = json.loads(response["body"])[0]
     assert row["errors"] == ["bandcamp"]
     assert (row["itunes_price"], row["beatport_price"], row["bandcamp_price"]) == (1.29, 1.49, -1)
-    assert row["bandcamp_url"] == ""
+    assert row["bandcamp_url"].startswith("https://bandcamp.com/search?")
     assert row["bandcamp_validated_at"] is None
     assert row["itunes_validated_at"].endswith("+00:00")
     assert row["beatport_validated_at"].endswith("+00:00")
@@ -905,7 +908,7 @@ def test_busy_itunes_still_searches_browser_stores_and_retries_only_apple(app, t
     assert apple_calls == ["Song"] and len(browser_calls) == 1
 
 
-def test_browser_only_search_bypasses_apple_database_admission(app, scraper, monkeypatch):
+def test_browser_only_search_bypasses_apple_database_admission(app, track_db, scraper, monkeypatch):
     import search_tracks
     def no_gate(*args, **kwargs):
         pytest.fail("Browser-only work must not touch Apple's gate")
@@ -914,7 +917,6 @@ def test_browser_only_search_bypasses_apple_database_admission(app, scraper, mon
         result = scraper.lambda_handler({"body": json_module.dumps(json), "headers": headers}, None)
         return FakeResponse(json_module.loads(result["body"]), result["statusCode"])
     monkeypatch.setattr(search_tracks, "itunes_slot", no_gate)
-    monkeypatch.setattr(search_tracks, "get_engine", no_gate)
     monkeypatch.setattr(search_tracks, "PLAYWRIGHT_API_URL", "https://scraper.example")
     monkeypatch.setattr(search_tracks.requests, "post", proxy)
     prices = search_tracks.get_api_prices("X", "Song", stores=["bandcamp", "beatport"])
@@ -961,3 +963,81 @@ def test_browser_work_consumes_apple_retry_delay(app, track_db, scraper, monkeyp
     prices = search_tracks.get_api_prices("X", "Song")
     assert prices["itunes_retry_after"] == 0
     assert prices["bandcamp_price"] == 0.99 and prices["beatport_price"] == 1.49
+
+
+@pytest.mark.parametrize('negative_store', ['bandcamp', 'beatport'])
+def test_old_browser_negative_is_rechecked_without_refreshing_itunes(app, track_db, monkeypatch, negative_store):
+    from sqlalchemy import MetaData, Table
+    from price_cache import utcnow, MATCHER_VERSION
+    app.get_engine()  # Apply the same provenance migration as a real read.
+    table = Table('track', MetaData(), autoload_with=track_db)
+    saved = validated_prices('X', 'Song')
+    saved.pop('errors'); saved.update(track_name='Song', artist='X')
+    saved.update({f'{negative_store}_price': -1, f'{negative_store}_url': '',
+                  f'{negative_store}_matched_artist': None, f'{negative_store}_matched_title': None,
+                  f'{negative_store}_matcher_version': MATCHER_VERSION,
+                  f'{negative_store}_validated_at': utcnow()})
+    with track_db.begin() as connection: connection.execute(table.insert().values(**saved))
+    calls=[]
+    def prices(artist,title,stores):
+        calls.append(stores); return validated_prices(artist,title,stores)
+    monkeypatch.setattr(app,'get_api_prices',prices)
+    response=app.lambda_handler(price_event(app,'POST','/db_results',body=json.dumps({'tracks':[{'name':'Song','artist':'X'}]})),None)
+    assert response['statusCode']==200
+    assert calls==[[negative_store]]
+    row=json.loads(response['body'])[0]
+    assert row['itunes_price']==1.29 and row[f'{negative_store}_price']>=0
+
+
+def test_musicbrainz_unavailable_does_not_stop_beatport_or_poison_bandcamp(app, track_db, scraper, monkeypatch):
+    import search_tracks
+    def blocked(*args): raise RuntimeError('MusicBrainz unavailable')
+    monkeypatch.setattr(search_tracks,'discover_bandcamp_sites',blocked)
+    monkeypatch.setattr(search_tracks,'PLAYWRIGHT_API_URL','https://scraper.example')
+    def proxy(url,json,headers,timeout):
+        import json as codec
+        assert json['stores']==['beatport']
+        result=scraper.lambda_handler({'body':codec.dumps(json),'headers':headers},None)
+        return FakeResponse(codec.loads(result['body']),result['statusCode'])
+    monkeypatch.setattr(search_tracks.requests,'post',proxy)
+    prices=search_tracks.get_api_prices('X','Song',stores=['bandcamp','beatport'])
+    assert prices['errors']==['bandcamp'] and prices['beatport_price']==1.49
+    assert prices['bandcamp_validated_at'] is None
+    assert prices['bandcamp_url'].startswith('https://bandcamp.com/search?')
+
+
+def test_recorded_http_pages_cross_signed_boundary_and_persist_real_prices(app, track_db, scraper, monkeypatch):
+    import search_tracks
+    import scraper_search.bandcamp_search as bc
+    import scraper_search.beatport_search as bp
+    from bs4 import BeautifulSoup
+    from pathlib import Path
+    fixture=Path(__file__).with_name('fixtures')
+    # Restore real provider methods: the common scraper fixture replaces them.
+    import importlib
+    importlib.reload(bc); importlib.reload(bp)
+    monkeypatch.setattr(scraper,'BandcampSearch',bc.BandcampSearch)
+    monkeypatch.setattr(scraper,'BeatportSearch',bp.BeatportSearch)
+    reads=[]
+    def page(url,*args,**kwargs):
+        reads.append(url)
+        name=('beatport_glue_http.html' if 'beatport.com' in url else
+              'bandcamp_music_http.html' if url.endswith('/music') else 'bandcamp_glue_http.html')
+        return BeautifulSoup((fixture/name).read_text(),'html.parser')
+    monkeypatch.setattr(bc,'page',page);monkeypatch.setattr(bp,'page',page)
+    monkeypatch.setattr(search_tracks,'PLAYWRIGHT_API_URL','https://scraper.example')
+    monkeypatch.setattr(search_tracks.ItuneSearch,'search_song',lambda *args: {'price':1.29,'url':'https://itunes.example'})
+    def proxy(url,json,headers,timeout):
+        import json as codec
+        response=scraper.lambda_handler({'body':codec.dumps(json),'headers':headers},None)
+        return FakeResponse(codec.loads(response['body']),response['statusCode'])
+    monkeypatch.setattr(search_tracks.requests,'post',proxy)
+    event=price_event(app,'POST','/db_results',body=json.dumps({'tracks':[{'name':'Glue','artist':'Bicep'}]}))
+    row=json.loads(app.lambda_handler(event,None)['body'])[0]
+    assert row['errors']==[]
+    assert row['bandcamp_price']==1.3 and row['beatport_price']==1.49
+    assert row['bandcamp_validated_at'] and row['beatport_validated_at']
+    assert not any('bandcamp.com/search' in url for url in reads)
+    count=len(reads)
+    app.lambda_handler(event,None)
+    assert len(reads)==count  # Both positive store prices survive the database round trip.

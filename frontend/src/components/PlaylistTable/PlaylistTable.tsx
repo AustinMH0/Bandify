@@ -44,16 +44,17 @@ interface SongPrice {
 
 const trackKey = (track: Track) => JSON.stringify([track.name, track.artist]);
 
-const PriceCell = ({ price, url, validatedAt }: {
+const PriceCell = ({ price, url, validatedAt, searchFallback }: {
   price?: number | null;
   url?: string;
   validatedAt?: string | null;
+  searchFallback?: string;
 }) => {
   const label = price == null || !Number.isFinite(price) || price < 0
     ? "N/A" : `$${price.toFixed(2)}`;
   const checked = validatedAt ? new Date(validatedAt) : null;
   return <>
-    {url && label !== "N/A" ? <a href={url}>{label}</a> : label}
+    {url && label !== "N/A" ? <a href={url}>{label}</a> : label === "N/A" && searchFallback ? <a href={searchFallback}>Search on Bandcamp</a> : label}
     {checked && Number.isFinite(checked.getTime()) && (
       <Text component="time" dateTime={validatedAt ?? undefined} size="xs" c="dimmed" span>
         {" "}checked {checked.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
@@ -345,7 +346,7 @@ const PlaylistTable = ({
                         <Table.Tr key={index}>
                           <Table.Td>{track.name}</Table.Td>
                           <Table.Td>
-                            <PriceCell price={songPrices[trackKey(track)]?.bandcamp_price} url={songPrices[trackKey(track)]?.bandcamp_url} validatedAt={songPrices[trackKey(track)]?.bandcamp_validated_at} />
+                            <PriceCell searchFallback={`https://bandcamp.com/search?q=${encodeURIComponent(`${track.name} ${track.artist}`)}&item_type=t`} price={songPrices[trackKey(track)]?.bandcamp_price} url={songPrices[trackKey(track)]?.bandcamp_url} validatedAt={songPrices[trackKey(track)]?.bandcamp_validated_at} />
                           </Table.Td>
                           <Table.Td>
                             <PriceCell price={songPrices[trackKey(track)]?.beatport_price} url={songPrices[trackKey(track)]?.beatport_url} validatedAt={songPrices[trackKey(track)]?.beatport_validated_at} />

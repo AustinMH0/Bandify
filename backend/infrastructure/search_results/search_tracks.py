@@ -8,6 +8,8 @@ import requests
 from search import ItuneSearch
 from admission import Busy, itunes_slot
 from db import get_engine
+from musicbrainz import discover_bandcamp_sites
+from urllib.parse import quote
 from price_cache import STORES, PROVENANCE_FIELDS, has_provenance, utcnow
 
 PLAYWRIGHT_API_URL = os.environ.get("PLAYWRIGHT_API_URL")
@@ -15,6 +17,7 @@ PLAYWRIGHT_API_URL = os.environ.get("PLAYWRIGHT_API_URL")
 
 def get_api_prices(artist, track_name, stores=STORES):
     """Search only requested stores and retain each provider's own provenance."""
+    deadline = time.monotonic() + 22
     results = {}
     errors = []
     retry_after = None
@@ -30,14 +33,28 @@ def get_api_prices(artist, track_name, stores=STORES):
             retry_after = time.monotonic() + busy.retry_after
 
     browser_stores = [store for store in stores if store in ("bandcamp", "beatport")]
+    sites = []
+    if "bandcamp" in browser_stores and PLAYWRIGHT_API_URL:
+        try:
+            sites = discover_bandcamp_sites(artist, get_engine())
+        except Exception as exc:
+            print(f"Bandcamp discovery failed: {type(exc).__name__}")
+            errors.append("bandcamp")
+            browser_stores.remove("bandcamp")
     if browser_stores:
         if PLAYWRIGHT_API_URL:
             try:
+                payload = {"artist": artist, "track_name": track_name, "stores": browser_stores}
+                if "bandcamp" in browser_stores:
+                    payload["bandcamp_sites"] = sites
+                remaining = deadline - time.monotonic()
+                if remaining <= 2:
+                    raise TimeoutError("Price lookup budget exhausted")
                 response = requests.post(
                     PLAYWRIGHT_API_URL,
-                    json={"artist": artist, "track_name": track_name, "stores": browser_stores},
-                    headers=scraper_headers({"artist": artist, "track_name": track_name, "stores": browser_stores}),
-                    timeout=(2, 16),
+                    json=payload,
+                    headers=scraper_headers(payload),
+                    timeout=(2, min(16, remaining - 2)),
                 )
                 response.raise_for_status()
                 data = response.json()
@@ -61,6 +78,8 @@ def get_api_prices(artist, track_name, stores=STORES):
         result = results.get(store, {}) if store not in errors else {}
         prices[f"{store}_price"] = result.get("price", -1)
         prices[f"{store}_url"] = result.get("url", "")
+        if store == "bandcamp" and prices[f"{store}_price"] == -1:
+            prices[f"{store}_url"] = f'https://bandcamp.com/search?q={quote(f"{track_name} {artist}")}&item_type=t'
         for field in PROVENANCE_FIELDS:
             prices[f"{store}_{field}"] = result.get(field) if field != "validated_at" else None
         if store not in errors and has_provenance(prices, store, artist, track_name):

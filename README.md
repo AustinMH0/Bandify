@@ -29,7 +29,9 @@ instrumental versions return N/A. POST price lookups reuse each store's saved
 price only when its matched identity and matcher version are validated and its
 validation timestamp is fresh. `PRICE_CACHE_TTL_SECONDS` on SearchResults sets
 the freshness window (default `604800`, seven days; `0` disables reuse). Completed
-no-match searches also expire after this window. Failed stores are retried on
+iTunes no-match searches also expire after this window. Negative Bandcamp and
+Beatport results are always rechecked on read, including older cached `-1` rows.
+Failed stores are retried on
 the next lookup; successful stores are saved independently. Stale or unvalidated
 prices are never returned as a fallback when a store fails.
 
@@ -44,8 +46,9 @@ the runtime role cannot migrate, an operator must run
 from the SearchResults source directory before rollout. No price rows are
 backfilled as validated: legacy rows and older scraper responses are rechecked.
 PostgreSQL timestamps use UTC with time zone. Bump `MATCHER_VERSION` in both
-identical `search/matching.py` copies when matching rules or provider identity
-extraction change. No frontend migration is needed.
+identical `search/matching.py` copies when shared identity rules change. These
+HTTP parser updates preserve validated positive prices and the iTunes cache.
+No frontend migration is needed.
 
 Foundation request controls: POST `/db_results` accepts exactly one track with
 nonempty `name` and `artist` strings (at most 300 characters each, no control
@@ -59,8 +62,8 @@ Spotify 429 responses preserve `Retry-After`.
 Only iTunes/Apple Search API cache misses use the shared database-backed
 admission slot across SearchResults instances, with at least six seconds between
 Apple calls (at most ten per minute). Bandcamp and Beatport do not acquire the
-slot and have no app-wide spacing: they retain their existing per-request
-bounded parallelism and timeouts. A busy Apple slot returns available browser
+Apple slot. MusicBrainz artist discovery for Bandcamp has its own shared slot;
+Beatport retains per-request bounded work without an app-wide gate. A busy Apple slot returns available browser
 prices immediately, with an `itunes_retry_after` delay on that track. The
 existing UI shows those prices while keeping its ripple during up to two Apple
 retries, then uses its existing retry message if Apple remains busy. Successful
@@ -86,3 +89,34 @@ SearchResults. An older coordinator will see scraper authentication failures
 during that rollout window and can retry afterward. No secret rotation or new
 AWS resources are needed. Keep the coordinator timeout below the Apple admission
 lease when changing deployment settings.
+
+Store HTTP lookups: Beatport uses one ordinary desktop User-Agent and reads
+`__NEXT_DATA__` track results, including artist, title, mix and USD currency.
+Challenges, HTTP errors and unknown schemas are provider failures, not missing
+prices. Bandcamp never calls `/search` or `/api`: SearchResults searches
+MusicBrainz for a single exact artist identity and reads its `bandcamp` URL
+relationship. The scraper reads that artist's `/music` page, tries matching
+advertised track links and a title-derived `/track/...` candidate, and verifies
+artist/title on the purchase page before selecting its digital JSON-LD offer.
+Physical offers are excluded. A missing/ambiguous artist or unmatched candidate
+shows **Search on Bandcamp**, a user-clickable search link. This bounded discovery
+does not exhaustively crawl old albums or guess among same-name artists; custom
+domains and redirected pages are not followed.
+
+MusicBrainz uses `Groovonomy/1.0` with the project/site URLs as its descriptive
+User-Agent. Its separate `musicbrainz_search_admission` table serializes discovery
+across coordinator instances, spaces the two calls by at least 1.1 seconds, and
+keeps another 1.1 seconds before handing off to the next discovery. The table
+uses the same DDL/permissions as the Apple admission table above; its creation
+requires `CREATE TABLE`, with read/write access afterward. A busy/unavailable
+MusicBrainz slot reports a Bandcamp error and search link while preserving other
+store prices. No network retries, proxy rotation or challenge solving is used.
+See [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API) and
+[rate limits](https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting).
+
+The existing Playwright-named Lambda/container remains the authenticated store
+worker even though the price providers now use HTTP. Removing its Chromium image
+and launch check can be a separate deployment change. Local HTTP evidence does
+not establish availability from AWS addresses; verify live behavior after the
+normal merge deployment. During rollout, the newer scraper returns a Bandcamp
+search link to older coordinators that do not yet supply discovered artist URLs.

@@ -36,6 +36,10 @@ def has_provenance(row, store, artist, title):
 
 
 def is_fresh(row, store, artist, title, now):
+    # Earlier browser parsers cached challenge/empty markup as completed -1.
+    # Recheck negative browser results on read, without altering iTunes cache.
+    if store in ("bandcamp", "beatport") and row.get(f"{store}_price", -1) == -1:
+        return False
     validated_at = row.get(f"{store}_validated_at")
     if not isinstance(validated_at, datetime.datetime) or not has_provenance(row, store, artist, title):
         return False
