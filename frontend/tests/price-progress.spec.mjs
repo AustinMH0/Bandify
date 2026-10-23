@@ -97,7 +97,8 @@ test.describe('store last-checked dates', () => {
     }] });
     await expect(modal.getByRole('status')).toHaveText('Looking up prices: 1/2');
     const firstCells = modal.getByRole('row').filter({ hasText: 'Blinding Lights' }).getByRole('cell');
-    await expect(firstCells.nth(1)).toHaveText('N/A checked Oct 16');
+    await expect(firstCells.nth(1)).toHaveText('Search on Bandcamp checked Oct 16');
+    await expect(firstCells.nth(1).getByRole('link', { name: 'Search on Bandcamp' })).toHaveAttribute('href', 'https://bandcamp.com/search?q=Blinding%20Lights%20The%20Weeknd&item_type=t');
     await expect(firstCells.nth(2)).toHaveText('$1.49');
     await expect(firstCells.nth(3).locator('time')).toHaveText('checked Oct 17');
     await expect(firstCells.nth(3).getByRole('link', { name: '$1.29' })).toHaveAttribute('href', 'https://itunes.example/song');

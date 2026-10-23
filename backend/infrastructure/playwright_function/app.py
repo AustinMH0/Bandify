@@ -56,13 +56,17 @@ def lambda_handler(event, context):
     ):
         return {"statusCode": 400, "body": json.dumps({"error": "Invalid stores"})}
 
+    sites = payload.get("bandcamp_sites", [])
+    if not isinstance(sites, list) or len(sites) > 1 or any(not isinstance(site, str) for site in sites):
+        return {"statusCode": 400, "body": json.dumps({"error": "Invalid Bandcamp sites"})}
+
     results = {}
     errors = []
     # Each provider owns its browser in its own thread. One store failing must
     # neither discard another store's price nor serialize both browser waits.
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures = {
-            name: pool.submit(search().search_song, track_name, artist)
+            name: pool.submit((search(sites) if name == "bandcamp" else search()).search_song, track_name, artist)
             for name, search in [("bandcamp", BandcampSearch), ("beatport", BeatportSearch)]
             if name in stores
         }

@@ -28,32 +28,43 @@ def _now(connection):
 
 
 @contextmanager
-def itunes_slot(engine):
+def _slot(engine, table, lock_key, interval, release_delay=0):
     owner = uuid.uuid4().hex
     with engine.begin() as connection:
         if connection.dialect.name == "postgresql":
             # Serialize the first CREATE across cold starts. IF NOT EXISTS
             # alone does not prevent Postgres catalog races on initial setup.
-            connection.execute(text("SELECT pg_advisory_xact_lock(724619201)"))
-        connection.execute(text("""CREATE TABLE IF NOT EXISTS itunes_search_admission (
+            connection.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_key})
+        connection.execute(text(f"""CREATE TABLE IF NOT EXISTS {table} (
             id INTEGER PRIMARY KEY, owner VARCHAR(32),
             lease_until DOUBLE PRECISION NOT NULL,
             next_allowed DOUBLE PRECISION NOT NULL)"""))
-        connection.execute(text("""INSERT INTO itunes_search_admission
+        connection.execute(text(f"""INSERT INTO {table}
             (id, owner, lease_until, next_allowed) VALUES (1, NULL, 0, 0)
             ON CONFLICT (id) DO NOTHING"""))
         now = _now(connection)
-        admitted = connection.execute(text("""UPDATE itunes_search_admission
+        admitted = connection.execute(text(f"""UPDATE {table}
             SET owner = :owner, lease_until = :lease, next_allowed = :next
             WHERE id = 1 AND lease_until <= :now AND next_allowed <= :now
             RETURNING id"""), {"owner": owner, "lease": now + LEASE_SECONDS,
-                                 "next": now + SEARCH_INTERVAL, "now": now}).first()
+                                 "next": now + interval, "now": now}).first()
         if not admitted:
-            row = connection.execute(text("SELECT lease_until, next_allowed FROM itunes_search_admission WHERE id = 1")).one()
+            row = connection.execute(text(f"SELECT lease_until, next_allowed FROM {table} WHERE id = 1")).one()
             raise Busy(max(row) - now)
     try:
         yield
     finally:
         with engine.begin() as connection:
-            connection.execute(text("""UPDATE itunes_search_admission SET owner = NULL, lease_until = 0
-                    WHERE id = 1 AND owner = :owner"""), {"owner": owner})
+            connection.execute(text(f"""UPDATE {table} SET owner = NULL, lease_until = 0,
+                    next_allowed = CASE WHEN next_allowed > :next THEN next_allowed ELSE :next END
+                    WHERE id = 1 AND owner = :owner"""), {"owner": owner, "next": _now(connection) + release_delay if release_delay else 0})
+
+
+def itunes_slot(engine):
+    return _slot(engine, "itunes_search_admission", 724619201, SEARCH_INTERVAL)
+
+
+def musicbrainz_slot(engine):
+    # Serialize discovery across Lambda instances; the worker also spaces its
+    # two HTTP requests. Keep a full second after completion before handoff.
+    return _slot(engine, "musicbrainz_search_admission", 724619202, 1.1, 1.1)

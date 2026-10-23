@@ -1,0 +1,24 @@
+{
+  "id": "10e8f0df-90f9-4957-aedd-c4e0d187e3a8",
+  "name": "Bicep",
+  "relations": [
+    {
+      "source-credit": "",
+      "target-type": "url",
+      "begin": null,
+      "attribute-ids": {},
+      "type": "bandcamp",
+      "type-id": "c550166e-0548-4a18-b1d4-e2ae423a3e88",
+      "attributes": [],
+      "target-credit": "",
+      "attribute-values": {},
+      "direction": "forward",
+      "url": {
+        "id": "65d58d4c-560a-496a-b0c2-0e054290e486",
+        "resource": "https://bicep.bandcamp.com/"
+      },
+      "ended": false,
+      "end": null
+    }
+  ]
+}
